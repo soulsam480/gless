@@ -1,0 +1,107 @@
+.wrapper {
+	width: 640px;
+	height: 640px;
+	border: 1px solid oklch(0.72 0 0);
+	border-radius: 4px;
+}
+
+.cell {
+	width: var(--cell-size);
+	height: var(--cell-size);
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+}
+
+.row {
+	display: grid;
+	grid-template-columns: repeat(8, 80px);
+}
+
+.row:nth-child(odd) .cell:nth-child(odd) {
+	background-color: white;
+}
+
+.row:nth-child(even) .cell:nth-child(odd) {
+	background-color: oklch(0.47 0 0);
+}
+
+.row:nth-child(even) .cell:nth-child(even) {
+	background-color: white;
+}
+
+.row:nth-child(odd) .cell:nth-child(even) {
+	background-color: oklch(0.47 0 0);
+}
+
+.row .cell:first-child:before {
+	position: absolute;
+	top: 50%;
+	left: -20%;
+	transform: translate(-50%, -50%);
+	content: attr(data-row);
+	z-index: 0;
+	color: oklch(0.72 0 0);
+}
+
+.row:last-child .cell:after {
+	position: absolute;
+	bottom: -50%;
+	left: 50%;
+	transform: translate(-50%, -50%);
+	content: attr(data-column);
+	z-index: 0;
+	color: oklch(0.72 0 0);
+}
+
+.piece {
+	position: relative;
+	height: var(--piece-size);
+	width: var(--piece-size);
+	border-radius: 1000px;
+}
+
+.piece[data-color="black"] {
+	background-color: oklch(0.47 0 0);
+	border: 1px solid white;
+}
+
+.piece[data-color="white"] {
+	background-color: white;
+	border: 1px solid oklch(0.47 0 0);
+}
+
+.piece:after {
+	font-size: 10px;
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	transform: translate(-50%, -50%);
+	content: attr(data-title);
+	z-index: 0;
+}
+
+.piece[data-color="black"]:after {
+	color: white;
+}
+
+.piece[data-color="white"]:after {
+	color: oklch(0.47 0 0);
+}
+
+#app {
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+	align-items: center;
+	height: 100vh;
+	width: 100vw;
+}
+
+body,
+html {
+	padding: 0;
+	margin: 0;
+}
