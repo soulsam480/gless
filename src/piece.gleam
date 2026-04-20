@@ -3,6 +3,7 @@ import gleam/int
 import gleam/javascript/array
 import gleam/list
 import gleam/option
+import utils
 
 pub const piece_size = 40
 
@@ -27,7 +28,7 @@ pub type PieceKind {
   Pawn(index: Int)
 }
 
-pub fn make_from(color: Color) -> List(Piece) {
+pub fn of(color: Color) -> List(Piece) {
   [
     Piece(color, King, default_pos(color, King)),
     Piece(color, Queen, default_pos(color, Queen)),
@@ -42,6 +43,68 @@ pub fn make_from(color: Color) -> List(Piece) {
     acc
     |> list.prepend(Piece(color, Pawn(curr), default_pos(color, Pawn(curr))))
   })
+}
+
+pub fn to_string(piece: Piece) -> String {
+  case piece.kind {
+    RookR -> "rook_r"
+    KnightR -> "knight_r"
+    BishopR -> "bishop_r"
+    King -> "king"
+    Queen -> "queen"
+    BishopL -> "bishop_l"
+    KnightL -> "knight_l"
+    RookL -> "rook_l"
+    Pawn(index) -> {
+      "pawn_" <> int.to_string(index)
+    }
+  }
+}
+
+pub fn color_str(piece: Piece) -> String {
+  case piece.color {
+    Black -> "black"
+    White -> "white"
+  }
+}
+
+pub fn mount(piece: Piece) -> dom.HtmlElement {
+  let cell_selector = utils.format("#app .cell[data-id='{}']", [piece.pos])
+
+  let assert option.Some(cell) = dom.query(cell_selector)
+
+  case from_dom(piece) {
+    option.Some(el) -> el
+    _ -> {
+      let el =
+        dom.h_el(
+          "div",
+          array.from_list([
+            #("class", "piece"),
+            #("data-color", color_str(piece)),
+            #("data-kind", to_string(piece)),
+            #("data-title", to_string(piece)),
+            #("data-pos", piece.pos),
+            #("style", size_var()),
+          ]),
+          array.from_list([]),
+        )
+
+      dom.append_child(cell, el)
+
+      el
+    }
+  }
+}
+
+pub fn unmount(piece: Piece) -> Bool {
+  case from_dom(piece) {
+    option.Some(el) -> {
+      dom.remove(el)
+      True
+    }
+    _ -> False
+  }
 }
 
 fn default_pos(color: Color, kind: PieceKind) -> String {
@@ -98,81 +161,10 @@ fn default_pos(color: Color, kind: PieceKind) -> String {
   }
 }
 
-pub fn to_string(piece: Piece) -> String {
-  case piece.kind {
-    RookR -> "rook_r"
-    KnightR -> "knight_r"
-    BishopR -> "bishop_r"
-    King -> "king"
-    Queen -> "queen"
-    BishopL -> "bishop_l"
-    KnightL -> "knight_l"
-    RookL -> "rook_l"
-    Pawn(index) -> {
-      "pawn_" <> int.to_string(index)
-    }
-  }
-}
-
-pub fn color_str(piece: Piece) -> String {
-  case piece.color {
-    Black -> "black"
-    White -> "white"
-  }
-}
-
-pub fn mount(piece: Piece) -> dom.HtmlElement {
-  let cell_selector = {
-    "#app " <> ".cell[data-id='" <> piece.pos <> "']"
-  }
-
-  let assert option.Some(cell) = dom.query(cell_selector)
-
-  case element(piece) {
-    option.Some(el) -> {
-      el
-    }
-
-    _ -> {
-      let el =
-        dom.h_el(
-          "div",
-          array.from_list([
-            #("class", "piece"),
-            #("data-color", color_str(piece)),
-            #("data-kind", to_string(piece)),
-            #("data-title", to_string(piece)),
-            #("data-pos", piece.pos),
-            #("style", size_var()),
-          ]),
-          array.from_list([]),
-        )
-
-      dom.append_child(cell, el)
-
-      el
-    }
-  }
-}
-
-fn element(piece: Piece) -> option.Option(dom.HtmlElement) {
+fn from_dom(piece: Piece) -> option.Option(dom.HtmlElement) {
   dom.query(".piece[data-kind" <> to_string(piece) <> "]")
 }
 
-pub fn unmount(piece: Piece) -> Bool {
-  let from_board = element(piece)
-
-  case from_board {
-    option.Some(el) -> {
-      dom.remove(el)
-      True
-    }
-    _ -> {
-      False
-    }
-  }
-}
-
 fn size_var() -> String {
-  "--piece-size: " <> int.to_string(piece_size) <> "px;"
+  utils.format("--piece-size: {}px;", [int.to_string(piece_size)])
 }

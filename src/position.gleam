@@ -24,15 +24,25 @@ pub type MoveCommand {
 }
 
 pub type Move {
-  Move(command: MoveCommand, dest: String, take: option.Option(piece.Piece))
+  Move(
+    command: List(MoveCommand),
+    dest: String,
+    take: option.Option(piece.Piece),
+  )
+}
+
+type Context {
+  Context(state: state.Board, occupancy: dict.Dict(String, piece.Piece))
 }
 
 pub fn possible(piece: piece.Piece, state: state.Board) -> List(Move) {
-  let occupancy_map = occupancy(state)
+  let occupancy_map = make_occupancy(state)
+
+  let ctx = Context(state: state, occupancy: occupancy_map)
 
   case piece.kind {
-    piece.King -> king_moves(piece, occupancy_map)
-    piece.Pawn(_) -> pawn_moves(piece, state, occupancy_map)
+    piece.King -> king_moves(piece, ctx)
+    piece.Pawn(_) -> pawn_moves(piece, ctx)
 
     _ -> {
       []
@@ -40,64 +50,83 @@ pub fn possible(piece: piece.Piece, state: state.Board) -> List(Move) {
   }
 }
 
-fn king_moves(
-  piece: piece.Piece,
-  occupancy: dict.Dict(String, piece.Piece),
-) -> List(Move) {
-  let pos = parse(piece.pos)
-
+fn king_moves(piece: piece.Piece, ctx: Context) -> List(Move) {
   [
     Up(1),
     Down(1),
     Left(1),
     Right(1),
+    TopRight(1),
+    TopLeft(1),
+    BottomRight(1),
+    BottomLeft(1),
   ]
   |> list.filter_map(fn(command) {
-    {
-      use <- bool.guard(reached_boundary(pos, command), Error(option.None))
-      let result_pos = move_with(piece, command) |> serialize
-
-      use p <- result.try(
-        dict.get(occupancy, result_pos)
-        |> result.replace_error(
-          option.Some(Move(command:, dest: result_pos, take: option.None)),
-        ),
-      )
-
-      use <- bool.guard(p.color == piece.color, Error(option.None))
-
-      Ok(Move(command:, dest: result_pos, take: option.Some(p)))
-    }
-    |> result.try_recover(option.to_result(_, Nil))
+    use _, occupant <- check_command(piece, command, ctx)
+    occupant.color != piece.color
   })
 }
 
-fn pawn_moves(
-  piece: piece.Piece,
-  state: state.Board,
-  occupancy: dict.Dict(String, piece.Piece),
-) -> List(Move) {
+fn pawn_moves(piece: piece.Piece, ctx: Context) -> List(Move) {
   let pos = parse(piece.pos)
 
+  // pawn can move 1/2 places if it's not moved yet
   case pos.1 == 2 || pos.1 == 7 {
     True -> [
-      pawn_forward_command(piece, state, 2),
-      pawn_forward_command(piece, state, 1),
+      pawn_forward_command(piece, 2),
+      pawn_forward_command(piece, 1),
     ]
-    False -> [pawn_forward_command(piece, state, 1)]
+    False -> [pawn_forward_command(piece, 1)]
   }
   |> list.filter_map(fn(command) {
-    use <- bool.guard(reached_boundary(pos, command), Error(Nil))
-    let result_pos = move_with(piece, command) |> serialize
+    use command, occupant <- check_command(piece, command, ctx)
 
-    case dict.get(occupancy, result_pos) {
-      Ok(_) -> Error(Nil)
-      _ -> Ok(Move(command:, dest: result_pos, take: option.None))
+    case command {
+      Up(_) | Down(_) | Left(_) | Right(_) -> False
+      _ -> occupant.color == piece.color
     }
   })
-  // TODO: implement diagonal take
 }
 
+type CheckResult {
+  Pass(pos: #(String, Int), take: option.Option(piece.Piece))
+  Fail
+}
+
+/// here we do few things
+/// 1. expand a command with more than one steps
+/// 2. then for each command move the piece and check if it has reached boundary
+/// 3. then check if we have an occupant on the next position
+/// 4. based on take_when, we know if we can cross this or take this
+fn check_command(
+  piece: piece.Piece,
+  command: MoveCommand,
+  ctx: Context,
+  take_when: fn(MoveCommand, piece.Piece) -> Bool,
+) {
+  let outcome =
+    list.fold_until(expand(command), Fail, fn(__, command_part) {
+      let result_pos = move_with(piece, command_part)
+
+      use <- bool.guard(reached_boundary(result_pos), list.Stop(Fail))
+
+      // TODO: need to figure out how to move knight
+      case dict.get(ctx.occupancy, serialize(result_pos)) {
+        Ok(occupant) -> {
+          use <- bool.guard(!take_when(command, occupant), list.Stop(Fail))
+          list.Continue(Pass(result_pos, option.Some(occupant)))
+        }
+        _ -> list.Continue(Pass(result_pos, option.None))
+      }
+    })
+
+  case outcome {
+    Fail -> Error(Nil)
+    Pass(pos, take) -> Ok(Move([command], serialize(pos), take:))
+  }
+}
+
+/// move a piece from it's current position to next one with a command
 fn move_with(piece: piece.Piece, command: MoveCommand) {
   let pos = parse(piece.pos)
 
@@ -105,43 +134,83 @@ fn move_with(piece: piece.Piece, command: MoveCommand) {
   let rank_to_file = make_rank_to_file()
 
   case command {
-    Up(step) -> {
-      #(pos.0, pos.1 + step)
+    Down(step) | Up(step) -> {
+      #(pos.0, case command {
+        Up(_) -> pos.1 + step
+        _ -> pos.1 - step
+      })
     }
 
-    Down(step) -> {
-      #(pos.0, pos.1 - step)
-    }
-
-    Left(step) -> {
+    Left(step) | Right(step) -> {
       let assert Ok(file) =
         dict.get(file_to_rank, pos.0)
-        |> result.try(fn(rank) { Ok({ rank - step }) })
-        |> result.try(fn(rank) { dict.get(rank_to_file, rank) })
+        |> result.map(fn(rank) {
+          case command {
+            Right(_) -> rank + step
+            _ -> rank - step
+          }
+        })
+        |> result.try(dict.get(rank_to_file, _))
 
       #(file, pos.1)
     }
 
-    Right(step) -> {
+    TopLeft(step) | TopRight(step) -> {
+      let rank = pos.1 + step
+
       let assert Ok(file) =
         dict.get(file_to_rank, pos.0)
-        |> result.try(fn(rank) { Ok({ rank + step }) })
-        |> result.try(fn(v) { dict.get(rank_to_file, v) })
+        |> result.map(fn(r) {
+          case command {
+            TopRight(_) -> r + step
+            _ -> r - step
+          }
+        })
+        |> result.try(dict.get(rank_to_file, _))
 
-      #(file, pos.1)
+      #(file, rank)
     }
 
-    _ -> {
-      pos
+    BottomLeft(step) | BottomRight(step) -> {
+      let rank = pos.1 - step
+
+      let assert Ok(file) =
+        dict.get(file_to_rank, pos.0)
+        |> result.map(fn(r) {
+          case command {
+            BottomRight(_) -> r + step
+            _ -> r - step
+          }
+        })
+        |> result.try(dict.get(rank_to_file, _))
+
+      #(file, rank)
     }
   }
 }
 
+/// expand a command with more than one steps to
+/// singular ones. this way we can see if a move
+/// can be stopped by an occupant
+fn expand(command: MoveCommand) -> List(MoveCommand) {
+  use <- bool.guard(command.step == 1, [command])
+  use acc, curr <- int.range(1, command.step + 1, [])
+
+  list.prepend(acc, case command {
+    Up(_) -> Up(curr)
+    Down(_) -> Down(curr)
+    Left(_) -> Left(curr)
+    Right(_) -> Right(curr)
+    TopLeft(_) -> TopLeft(curr)
+    TopRight(_) -> TopRight(curr)
+    BottomLeft(_) -> BottomLeft(curr)
+    BottomRight(_) -> BottomRight(curr)
+  })
+}
+
 fn parse(pos: String) {
   let parts = string.split(pos, "")
-
   let assert Ok(file) = parts |> list.first
-
   let assert Ok(rank) = parts |> list.last |> result.try(fn(v) { int.parse(v) })
   #(file, rank)
 }
@@ -150,44 +219,11 @@ fn serialize(pos: #(String, Int)) -> String {
   pos.0 <> int.to_string(pos.1)
 }
 
-fn reached_boundary(pos: #(String, Int), command: MoveCommand) -> Bool {
-  case command {
-    Up(_) -> {
-      pos.1 == 8
-    }
-
-    Down(_) -> {
-      pos.1 == 1
-    }
-
-    Left(_) -> {
-      pos.0 == "a"
-    }
-
-    Right(_) -> {
-      pos.0 == "h"
-    }
-
-    // NOTE: below are wrong
-    BottomLeft(_) -> {
-      pos.0 == "a" && pos.1 == 1
-    }
-
-    BottomRight(_) -> {
-      pos.0 == "h" && pos.1 == 1
-    }
-
-    TopLeft(_) -> {
-      pos.0 == "a" && pos.1 == 8
-    }
-
-    TopRight(_) -> {
-      pos.0 == "h" && pos.1 == 8
-    }
-  }
+fn reached_boundary(pos: #(String, Int)) -> Bool {
+  !{ pos.1 >= 1 && pos.1 <= 8 } || !list.contains(x_axis, pos.0)
 }
 
-fn occupancy(state: state.Board) -> dict.Dict(String, piece.Piece) {
+fn make_occupancy(state: state.Board) -> dict.Dict(String, piece.Piece) {
   list.fold(state.pieces, dict.new(), fn(acc, curr) {
     dict.insert(acc, curr.pos, curr)
   })
@@ -212,12 +248,8 @@ fn make_file_to_rank() {
   })
 }
 
-fn pawn_forward_command(
-  piece: piece.Piece,
-  state: state.Board,
-  step: Int,
-) -> MoveCommand {
-  case piece.color == state.starting {
+fn pawn_forward_command(piece: piece.Piece, step: Int) -> MoveCommand {
+  case piece.color == piece.White {
     True -> Up(step)
     False -> Down(step)
   }

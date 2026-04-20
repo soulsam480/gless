@@ -31,6 +31,9 @@
 		"paths": {
 			"@/gleam_std/*": [
 				"./build/dev/javascript/gleam_stdlib/*"
+			],
+			"@/chess/preact/*": [
+				"./build/dev/javascript/chess/preact/*"
 			]
 		}
 	},
