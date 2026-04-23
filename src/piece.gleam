@@ -1,8 +1,8 @@
-import dom
 import gleam/int
-import gleam/javascript/array
 import gleam/list
 import gleam/option
+import preact/component
+import preact/vnode
 import utils
 
 pub const piece_size = 40
@@ -68,43 +68,20 @@ pub fn color_str(piece: Piece) -> String {
   }
 }
 
-pub fn mount(piece: Piece) -> dom.HtmlElement {
-  let cell_selector = utils.format("#app .cell[data-id='{}']", [piece.pos])
+pub fn new(piece: Piece, on_click: fn(Piece) -> Nil) {
+  component.new(fn(_, props) {
+    let assert option.Some(#(piece, on_click)) = props
 
-  let assert option.Some(cell) = dom.query(cell_selector)
-
-  case from_dom(piece) {
-    option.Some(el) -> el
-    _ -> {
-      let el =
-        dom.h_el(
-          "div",
-          array.from_list([
-            #("class", "piece"),
-            #("data-color", color_str(piece)),
-            #("data-kind", to_string(piece)),
-            #("data-title", to_string(piece)),
-            #("data-pos", piece.pos),
-            #("style", size_var()),
-          ]),
-          array.from_list([]),
-        )
-
-      dom.append_child(cell, el)
-
-      el
-    }
-  }
-}
-
-pub fn unmount(piece: Piece) -> Bool {
-  case from_dom(piece) {
-    option.Some(el) -> {
-      dom.remove(el)
-      True
-    }
-    _ -> False
-  }
+    vnode.new("div")
+    |> vnode.prop("class", "piece")
+    |> vnode.prop("data-color", color_str(piece))
+    |> vnode.prop("data-kind", to_string(piece))
+    |> vnode.prop("data-title", to_string(piece))
+    |> vnode.prop("data-pos", piece.pos)
+    |> vnode.prop("style", size_var())
+    |> vnode.on("click", fn(_) { on_click(piece) })
+  })
+  |> component.render(option.Some(#(piece, on_click)))
 }
 
 fn default_pos(color: Color, kind: PieceKind) -> String {
@@ -159,10 +136,6 @@ fn default_pos(color: Color, kind: PieceKind) -> String {
       }
     }
   }
-}
-
-fn from_dom(piece: Piece) -> option.Option(dom.HtmlElement) {
-  dom.query(".piece[data-kind" <> to_string(piece) <> "]")
 }
 
 fn size_var() -> String {

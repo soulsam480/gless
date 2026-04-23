@@ -1,7 +1,7 @@
 pub type Signal(a)
 
 @external(javascript, "@preact/signals", "signal")
-pub fn signal(a: a) -> Signal(a)
+pub fn new(a: a) -> Signal(a)
 
 @external(javascript, "@preact/signals", "computed")
 pub fn computed(fun: fn() -> a) -> Signal(a)

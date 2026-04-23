@@ -16,6 +16,7 @@ pub type Children {
   Text(child: String)
   TextArgs(child: String, args: List(String))
   TextSignal(child: String, args: List(signal.Signal(String)))
+  Empty
 }
 
 pub type Prop {
@@ -27,7 +28,7 @@ pub fn new(tag: String) -> VNode {
   VNode(tag: tag, props: [], children: [])
 }
 
-pub fn attr(vnode: VNode, key: String, value: String) -> VNode {
+pub fn prop(vnode: VNode, key: String, value: String) -> VNode {
   VNode(..vnode, props: list.prepend(vnode.props, Attr(key:, value:)))
 }
 
