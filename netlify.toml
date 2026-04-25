@@ -1,0 +1,3 @@
+[build]
+command = "MISE_AQUA_GITHUB_ATTESTATIONS=false mise install && bun run build"
+publish = "dist"
