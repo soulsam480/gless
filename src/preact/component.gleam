@@ -1,35 +1,37 @@
-import gleam/option
 import preact/vnode
 
 pub type PreactComponent
 
 @external(javascript, "./component_ffi.mjs", "h")
-pub fn to_preact(node: vnode.VNode) -> PreactComponent
+pub fn to_preact(from node: vnode.VNode) -> PreactComponent
 
-pub type Component(s, p) {
-  Component(
-    render: fn(option.Option(s), p) -> vnode.VNode,
-    state: option.Option(fn(p) -> s),
-  )
+pub type Component(p) {
+  Component(render: fn(p) -> vnode.VNode)
 }
 
-pub fn new(render: fn(option.Option(s), p) -> vnode.VNode) -> Component(s, p) {
-  Component(render:, state: option.None)
+pub fn new() -> Component(p) {
+  Component(render: fn(__) { vnode.empty() })
 }
 
-pub fn setup(component: Component(s, p), state: fn(p) -> s) -> Component(s, p) {
-  Component(..component, state: option.Some(state))
+pub fn render(
+  for _component: Component(p),
+  with factory: fn(p) -> vnode.VNode,
+) -> Component(p) {
+  Component(render: factory)
 }
 
-pub fn render(component: Component(s, p), props: p) -> vnode.VNode {
-  case component.state {
-    option.Some(setup) -> {
-      setup(props)
-      |> option.Some
-      |> component.render(props)
+pub fn render_result(
+  for _component: Component(p),
+  with factory: fn(p) -> Result(vnode.VNode, e),
+) -> Component(p) {
+  Component(render: fn(props) {
+    case factory(props) {
+      Ok(node) -> node
+      Error(_) -> vnode.empty()
     }
-    _ -> {
-      component.render(option.None, props)
-    }
-  }
+  })
+}
+
+pub fn to_vnode(render component: Component(p), with props: p) -> vnode.VNode {
+  component.render(props)
 }

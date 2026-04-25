@@ -15,6 +15,16 @@
 	justify-content: center;
 }
 
+.cell[data-is-in-path="True"]:before {
+	top: 0;
+	right: 0;
+	left: 0;
+	bottom: 0;
+	background: oklch(0.6 0.03 101.22 / 0.7);
+	position: absolute;
+	content: "";
+}
+
 .row {
 	display: grid;
 	grid-template-columns: repeat(8, 80px);

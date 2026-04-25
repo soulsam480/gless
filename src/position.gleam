@@ -6,7 +6,6 @@ import gleam/option
 import gleam/result
 import gleam/string
 import piece
-import state
 
 pub const x_axis = ["a", "b", "c", "d", "e", "f", "g", "h"]
 
@@ -24,30 +23,42 @@ pub type MoveCommand {
 }
 
 pub type Move {
-  Move(
-    command: List(MoveCommand),
-    dest: String,
-    take: option.Option(piece.Piece),
-  )
+  Move(positions: List(String), final: String, take: option.Option(piece.Piece))
 }
 
 type Context {
-  Context(state: state.Board, occupancy: dict.Dict(String, piece.Piece))
+  Context(pieces: List(piece.Piece), occupancy: dict.Dict(String, piece.Piece))
 }
 
-pub fn possible(piece: piece.Piece, state: state.Board) -> List(Move) {
-  let occupancy_map = make_occupancy(state)
+pub fn possible(
+  moves_for piece: piece.Piece,
+  with_other pieces: List(piece.Piece),
+) -> List(Move) {
+  let occupancy_map = make_occupancy(pieces)
 
-  let ctx = Context(state: state, occupancy: occupancy_map)
+  let ctx = Context(pieces:, occupancy: occupancy_map)
 
   case piece.kind {
     piece.King -> king_moves(piece, ctx)
     piece.Pawn(_) -> pawn_moves(piece, ctx)
-
-    _ -> {
-      []
-    }
+    _ -> []
   }
+}
+
+pub fn run(
+  move move: Move,
+  on piece: piece.Piece,
+  with_other pieces: List(piece.Piece),
+) -> List(piece.Piece) {
+  list.fold(pieces, [], fn(acc, curr) {
+    use <- bool.guard(option.is_some(move.take) && move.final == curr.pos, acc)
+    use <- bool.guard(
+      piece.to_string(curr) != piece.to_string(piece),
+      list.prepend(acc, curr),
+    )
+
+    list.prepend(acc, piece.Piece(..curr, pos: move.final))
+  })
 }
 
 fn king_moves(piece: piece.Piece, ctx: Context) -> List(Move) {
@@ -89,8 +100,19 @@ fn pawn_moves(piece: piece.Piece, ctx: Context) -> List(Move) {
 }
 
 type CheckResult {
-  Pass(pos: #(String, Int), take: option.Option(piece.Piece))
+  Pass(positions: List(String), take: option.Option(piece.Piece))
   Fail
+}
+
+fn new_or_append(
+  check_result: CheckResult,
+  pos: String,
+  occupant: option.Option(piece.Piece),
+) {
+  case check_result {
+    Pass(current, _) -> Pass(list.append([pos], current), occupant)
+    _ -> Pass([pos], occupant)
+  }
 }
 
 /// here we do few things
@@ -105,7 +127,7 @@ fn check_command(
   take_when: fn(MoveCommand, piece.Piece) -> Bool,
 ) {
   let outcome =
-    list.fold_until(expand(command), Fail, fn(__, command_part) {
+    list.fold_until(expand(command), Fail, fn(acc, command_part) {
       let result_pos = move_with(piece, command_part)
 
       use <- bool.guard(reached_boundary(result_pos), list.Stop(Fail))
@@ -114,20 +136,26 @@ fn check_command(
       case dict.get(ctx.occupancy, serialize(result_pos)) {
         Ok(occupant) -> {
           use <- bool.guard(!take_when(command, occupant), list.Stop(Fail))
-          list.Continue(Pass(result_pos, option.Some(occupant)))
+
+          list.Continue(new_or_append(
+            acc,
+            result_pos |> serialize,
+            option.Some(occupant),
+          ))
         }
-        _ -> list.Continue(Pass(result_pos, option.None))
+        _ ->
+          list.Continue(new_or_append(acc, result_pos |> serialize, option.None))
       }
     })
 
   case outcome {
     Fail -> Error(Nil)
-    Pass(pos, take) -> Ok(Move([command], serialize(pos), take:))
+    Pass(pos, take) -> Ok(Move(pos, list.last(pos) |> result.unwrap(""), take:))
   }
 }
 
 /// move a piece from it's current position to next one with a command
-fn move_with(piece: piece.Piece, command: MoveCommand) {
+fn move_with(piece: piece.Piece, command: MoveCommand) -> #(String, Int) {
   let pos = parse(piece.pos)
 
   let file_to_rank = make_file_to_rank()
@@ -223,8 +251,8 @@ fn reached_boundary(pos: #(String, Int)) -> Bool {
   !{ pos.1 >= 1 && pos.1 <= 8 } || !list.contains(x_axis, pos.0)
 }
 
-fn make_occupancy(state: state.Board) -> dict.Dict(String, piece.Piece) {
-  list.fold(state.pieces, dict.new(), fn(acc, curr) {
+fn make_occupancy(pieces: List(piece.Piece)) -> dict.Dict(String, piece.Piece) {
+  list.fold(pieces, dict.new(), fn(acc, curr) {
     dict.insert(acc, curr.pos, curr)
   })
 }

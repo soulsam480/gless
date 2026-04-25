@@ -18,32 +18,6 @@ const find_gl = (el: string, scope?: HTMLElement) => {
 	return Option$None();
 };
 
-const h = (
-	tag: string,
-	attrs: Record<string, string> | Array<[string, string]> = {},
-	children: Array<string | HTMLElement> = [],
-) => {
-	if (Array.isArray(attrs)) {
-		attrs = Object.fromEntries(attrs);
-	}
-
-	const el = document.createElement(tag);
-
-	for (const attr in attrs) {
-		el.setAttribute(attr, attrs[attr]);
-	}
-
-	for (const child of children) {
-		if (typeof child === "string") {
-			el.appendChild(document.createTextNode(child));
-		} else {
-			el.appendChild(child);
-		}
-	}
-
-	return el;
-};
-
 const set_attr = (
 	element: HTMLElement,
 	attrs: Record<string, string> | Array<[string, string]>,
@@ -72,12 +46,12 @@ const remove = (el: HTMLElement) => {
 };
 
 const add_listener = (
-	on: string | HTMLElement,
+	on: string | HTMLElement | Window,
 	event: string,
 	handle: (event: Event) => void,
 ) => {
 	const handler = (event: Event) => {
-		if (typeof on === "string" && !event_has_target(event, on)) {
+		if (typeof on === "string" && !event_matches(event, on)) {
 			return;
 		}
 
@@ -93,19 +67,31 @@ const add_listener = (
 	};
 };
 
-const event_has_target = (event: Event, target: string) => {
+const add_global_listener = (
+	event: string,
+	handler: (event: Event) => void,
+) => {
+	add_listener(window, event, handler);
+};
+
+const event_matches = (event: Event, target: string) => {
 	const el = event.target as HTMLElement;
 
 	return el.matches(target);
 };
 
+const event_stop_propagation = (event: Event) => {
+	event.stopPropagation();
+};
+
 export {
+	add_global_listener,
 	add_listener,
 	append_child,
-	event_has_target,
+	event_matches,
+	event_stop_propagation,
 	find as $,
 	find_gl,
-	h,
 	rect,
 	remove,
 	set_attr,

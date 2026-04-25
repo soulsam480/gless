@@ -1,7 +1,11 @@
+import dom
+import gleam/bool
 import gleam/int
 import gleam/list
 import gleam/option
+import gleam/result
 import preact/component
+import preact/signal
 import preact/vnode
 import utils
 
@@ -46,7 +50,8 @@ pub fn of(color: Color) -> List(Piece) {
 }
 
 pub fn to_string(piece: Piece) -> String {
-  case piece.kind {
+  color_str(piece)
+  <> case piece.kind {
     RookR -> "rook_r"
     KnightR -> "knight_r"
     BishopR -> "bishop_r"
@@ -68,9 +73,14 @@ pub fn color_str(piece: Piece) -> String {
   }
 }
 
-pub fn new(piece: Piece, on_click: fn(Piece) -> Nil) {
-  component.new(fn(_, props) {
-    let assert option.Some(#(piece, on_click)) = props
+pub fn new(
+  piece: Piece,
+  is_focused: signal.Signal(Bool),
+  handle on_click: fn(Piece) -> a,
+) {
+  {
+    use props <- component.render_result(component.new())
+    use #(piece, on_click) <- result.try(option.to_result(props, Nil))
 
     vnode.new("div")
     |> vnode.prop("class", "piece")
@@ -78,10 +88,19 @@ pub fn new(piece: Piece, on_click: fn(Piece) -> Nil) {
     |> vnode.prop("data-kind", to_string(piece))
     |> vnode.prop("data-title", to_string(piece))
     |> vnode.prop("data-pos", piece.pos)
+    |> vnode.signal_prop(
+      "data-focused",
+      signal.computed(fn() { signal.value(is_focused) |> bool.to_string }),
+    )
     |> vnode.prop("style", size_var())
-    |> vnode.on("click", fn(_) { on_click(piece) })
-  })
-  |> component.render(option.Some(#(piece, on_click)))
+    |> vnode.on("click", fn(e) {
+      e |> dom.event_stop_propagation
+      on_click(piece)
+      Nil
+    })
+    |> Ok
+  }
+  |> component.to_vnode(option.Some(#(piece, on_click)))
 }
 
 fn default_pos(color: Color, kind: PieceKind) -> String {

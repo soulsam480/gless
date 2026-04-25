@@ -1,18 +1,27 @@
+// @ts-check
+
+import { Show } from "@preact/signals/utils";
 import { h as preact_h } from "preact";
 import {
 	Children$isNode,
+	Children$isNodeSignal,
 	Children$isText,
 	Children$isTextArgs,
 	Children$isTextSignal,
 	Children$Node$child,
+	Children$NodeSignal$else_render,
+	Children$NodeSignal$state,
+	Children$NodeSignal$then_render,
 	Children$Text$child,
 	Children$TextArgs$args,
 	Children$TextArgs$child,
 	Prop$Attr$key,
 	Prop$Attr$value,
+	Prop$AttrSignal$value,
 	Prop$Handler$event,
 	Prop$Handler$handle,
 	Prop$isAttr,
+	Prop$isAttrSignal,
 	Prop$isHandler,
 	VNode$VNode$children,
 	VNode$VNode$props,
@@ -32,11 +41,17 @@ function camelCase(str) {
 
 /**
  * @param {import('@/chess/preact/vnode.mjs').VNode} node
- * @returns {import('preact').VNode}
+ * @returns {import('preact').ComponentChildren}
  */
 export function h(node) {
+	const tag = VNode$VNode$tag(node);
+
+	if (tag === "$NULL") {
+		return null;
+	}
+
 	return preact_h(
-		VNode$VNode$tag(node),
+		tag,
 		serializeProps(VNode$VNode$props(node)),
 		serializeChildren(VNode$VNode$children(node)),
 	);
@@ -47,22 +62,30 @@ export function h(node) {
  * @returns {Record<string, unknown>}
  */
 function serializeProps(props) {
-	return props.toArray().reduce((acc, prop) => {
-		if (Prop$isAttr(prop)) {
-			acc[Prop$Attr$key(prop)] = Prop$Attr$value(prop);
+	return props.toArray().reduce(
+		(
+			/** @type {Record<string, unknown>} */
+			acc,
+			prop,
+		) => {
+			if (Prop$isAttr(prop) || Prop$isAttrSignal(prop)) {
+				acc[Prop$Attr$key(prop)] =
+					Prop$Attr$value(prop) ?? Prop$AttrSignal$value(prop);
+
+				return acc;
+			}
+
+			if (Prop$isHandler(prop)) {
+				acc[camelCase(`on_${Prop$Handler$event(prop)}`)] =
+					Prop$Handler$handle(prop);
+
+				return acc;
+			}
 
 			return acc;
-		}
-
-		if (Prop$isHandler(prop)) {
-			acc[camelCase(`on_${Prop$Handler$event(prop)}`)] =
-				Prop$Handler$handle(prop);
-
-			return acc;
-		}
-
-		return acc;
-	}, {});
+		},
+		{},
+	);
 }
 
 /**
@@ -74,6 +97,18 @@ function serializeChildren(children) {
 		.map((child) => {
 			if (Children$isNode(child)) {
 				return h(Children$Node$child(child));
+			}
+
+			if (Children$isNodeSignal(child)) {
+				const state = Children$NodeSignal$state(child);
+				const then_render = Children$NodeSignal$then_render(child);
+				const else_render = Children$NodeSignal$else_render(child);
+
+				return preact_h(Show, {
+					when: state,
+					children: h(then_render),
+					fallback: h(else_render),
+				});
 			}
 
 			if (Children$isTextArgs(child) || Children$isTextSignal(child)) {

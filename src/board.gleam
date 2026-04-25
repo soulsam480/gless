@@ -1,4 +1,6 @@
 import dimension
+import dom
+import gleam/bool
 import gleam/int
 import gleam/list
 import gleam/option
@@ -13,10 +15,20 @@ import utils
 
 pub fn render_board() -> component.PreactComponent {
   let board_state =
-    piece.of(piece.Black)
-    |> list.append(piece.of(piece.White))
-    |> state.Board(piece.White)
+    state.new()
+    |> state.set_pieces(
+      piece.of(piece.Black)
+      |> list.append(piece.of(piece.White)),
+    )
     |> signal.new
+
+  // signal.effect(fn() { board_state |> signal.value |> echo })
+
+  dom.add_global_listener("click", fn(ev) {
+    use <- bool.guard(dom.event_matches(ev, ".wrapper *"), Nil)
+    signal.setter(board_state, fn(prev) { state.clear_focused(prev) })
+    Nil
+  })
 
   vnode.new("div")
   |> vnode.prop("class", "wrapper")
@@ -25,16 +37,9 @@ pub fn render_board() -> component.PreactComponent {
       vnode.new("div")
       |> vnode.prop("class", "row")
       |> vnode.children(
-        list.map(position.x_axis, fn(on_x) {
-          let piece =
-            signal.computed(fn() {
-              list.find(signal.value(board_state).pieces, fn(p) {
-                p.pos == on_x <> el
-              })
-              |> option.from_result
-            })
-
-          cell(#(on_x, el, piece))
+        list.map(position.x_axis, fn(on_x: String) -> vnode.VNode {
+          CellProps(on_x:, el:, board_state:)
+          |> cell
         }),
       )
     }),
@@ -42,30 +47,120 @@ pub fn render_board() -> component.PreactComponent {
   |> component.to_preact
 }
 
-fn cell(props: #(String, String, signal.Signal(option.Option(piece.Piece)))) {
-  component.new(fn(_, props) {
-    let assert option.Some(#(on_x, el, piece)) = props
+type CellProps {
+  CellProps(on_x: String, el: String, board_state: signal.Signal(state.Board))
+}
+
+fn cell(props: CellProps) {
+  {
+    use props <- component.render_result(component.new())
+
+    use CellProps(on_x, el, board_state) <- result.try(option.to_result(
+      props,
+      Nil,
+    ))
+
+    let cell_id = on_x <> el
+
+    let piece =
+      board_state
+      |> signal.map(fn(state) {
+        list.find(state.pieces, fn(p) { p.pos == cell_id })
+        |> option.from_result
+      })
+
+    let is_focused =
+      signal.computed(with: fn() {
+        case
+          signal.value(board_state).focused |> option.map(fn(v) { v.piece }),
+          signal.value(piece)
+        {
+          option.Some(left), option.Some(right) ->
+            piece.to_string(left) == piece.to_string(right)
+          _, _ -> False
+        }
+      })
+
+    let is_in_path =
+      board_state
+      |> signal.map(fn(state) {
+        state.focused
+        |> option.map(fn(s) {
+          s.moves
+          |> list.any(fn(m) { m.positions |> list.contains(cell_id) })
+        })
+        |> option.unwrap(False)
+      })
+
+    let destination_move =
+      board_state
+      |> signal.map(fn(state) {
+        state.focused
+        |> option.then(fn(s) {
+          s.moves
+          |> list.find(fn(m) { m.final == cell_id })
+          |> option.from_result
+        })
+      })
+
+    case cell_id == "d4" {
+      True ->
+        signal.effect(fn() {
+          signal.value(piece) |> echo
+
+          Nil
+        })
+      _ -> Nil
+    }
 
     vnode.new("div")
     |> vnode.prop("class", "cell")
-    |> vnode.prop("data-id", on_x <> el)
+    |> vnode.prop("data-id", cell_id)
     |> vnode.prop("data-row", el)
     |> vnode.prop("data-column", on_x)
+    |> vnode.signal_prop(
+      "data-is-in-path",
+      is_in_path |> signal.map(bool.to_string),
+    )
     |> vnode.prop(
       "style",
       utils.format("--cell-size: {}px;", [
         dimension.cell_size |> int.to_string,
       ]),
     )
-  })
-  |> component.render(option.Some(props))
+    |> vnode.on("click", fn(_) {
+      case signal.peek(destination_move) {
+        option.Some(move) -> {
+          signal.setter(board_state, fn(prev) {
+            let assert option.Some(focus_state) = prev.focused
+
+            prev
+            |> state.set_pieces(position.run(
+              move,
+              focus_state.piece,
+              prev.pieces,
+            ))
+            |> state.clear_focused
+          })
+
+          Nil
+        }
+
+        _ -> Nil
+      }
+    })
+    |> vnode.wrap_if_signal(piece, render: fn(piece) {
+      piece.new(piece, is_focused, handle: fn(p) {
+        signal.setter(board_state, fn(prev) {
+          prev
+          |> state.set_focused(state.FocusState(
+            piece,
+            moves: position.possible(p, { board_state |> signal.value }.pieces),
+          ))
+        })
+      })
+    })
+    |> Ok
+  }
+  |> component.to_vnode(option.Some(props))
 }
-// fn render_pieces(state: state.Board) {
-//   list.each(state.pieces, fn(it) {
-//     piece.mount(it)
-//     |> dom.listen("click", fn(_) {
-//       position.possible(it, state) |> echo
-//       Nil
-//     })
-//   })
-// }
