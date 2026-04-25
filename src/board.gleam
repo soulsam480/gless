@@ -22,8 +22,6 @@ pub fn render_board() -> component.PreactComponent {
     )
     |> signal.new
 
-  // signal.effect(fn() { board_state |> signal.value |> echo })
-
   dom.add_global_listener("click", fn(ev) {
     use <- bool.guard(dom.event_matches(ev, ".wrapper *"), Nil)
     signal.setter(board_state, fn(prev) { state.clear_focused(prev) })
@@ -102,16 +100,6 @@ fn cell(props: CellProps) {
           |> option.from_result
         })
       })
-
-    case cell_id == "d4" {
-      True ->
-        signal.effect(fn() {
-          signal.value(piece) |> echo
-
-          Nil
-        })
-      _ -> Nil
-    }
 
     vnode.new("div")
     |> vnode.prop("class", "cell")

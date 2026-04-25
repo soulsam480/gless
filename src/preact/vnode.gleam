@@ -12,7 +12,11 @@ pub type Children {
   Text(child: String)
   TextArgs(child: String, args: List(String))
   TextSignal(child: String, args: List(signal.Signal(String)))
-  NodeSignal(state: signal.Signal(Bool), then_render: VNode, else_render: VNode)
+  NodeSignal(
+    state: signal.Signal(Bool),
+    then_render: fn() -> VNode,
+    else_render: VNode,
+  )
 }
 
 pub type Prop {
@@ -57,16 +61,27 @@ pub fn wrap_if_signal(
   when: signal.Signal(option.Option(a)),
   render render: fn(a) -> VNode,
 ) -> VNode {
+  wrap_ternary_signal(vnode, when, render, empty)
+}
+
+pub fn wrap_ternary_signal(
+  vnode: VNode,
+  when: signal.Signal(option.Option(a)),
+  render render: fn(a) -> VNode,
+  else_render else_render: fn() -> VNode,
+) -> VNode {
   VNode(
     ..vnode,
     children: list.append(vnode.children, [
       NodeSignal(
         signal.map(when, option.is_some),
-        case signal.value(when) {
-          option.Some(v) -> render(v)
-          _ -> empty()
+        fn() {
+          case signal.value(when) {
+            option.Some(v) -> render(v)
+            _ -> empty()
+          }
         },
-        empty(),
+        else_render(),
       ),
     ]),
   )

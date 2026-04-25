@@ -106,7 +106,7 @@ function serializeChildren(children) {
 
 				return preact_h(Show, {
 					when: state,
-					children: h(then_render),
+					children: () => h(then_render()),
 					fallback: h(else_render),
 				});
 			}
