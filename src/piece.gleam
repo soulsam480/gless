@@ -4,10 +4,10 @@ import gleam/int
 import gleam/list
 import gleam/option
 import gleam/result
+import gleam/string
 import preact/component
 import preact/signal
 import preact/vnode
-import utils
 
 pub const piece_size = 40
 
@@ -86,13 +86,20 @@ pub fn new(
     |> vnode.prop("class", "piece")
     |> vnode.prop("data-color", color_str(piece))
     |> vnode.prop("data-kind", to_string(piece))
-    |> vnode.prop("data-title", to_string(piece))
+    |> vnode.prop(
+      "data-title",
+      to_string(piece)
+        |> string.split("_")
+        |> list.first
+        |> result.unwrap("")
+        |> string.replace("black", "")
+        |> string.replace("white", ""),
+    )
     |> vnode.prop("data-pos", piece.pos)
     |> vnode.signal_prop(
       "data-focused",
       signal.computed(fn() { signal.value(is_focused) |> bool.to_string }),
     )
-    |> vnode.prop("style", size_var())
     |> vnode.on("click", fn(e) {
       e |> dom.event_stop_propagation
       on_click(piece)
@@ -155,8 +162,4 @@ fn default_pos(color: Color, kind: PieceKind) -> String {
       }
     }
   }
-}
-
-fn size_var() -> String {
-  utils.format("--piece-size: {}px;", [int.to_string(piece_size)])
 }

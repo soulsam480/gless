@@ -61,6 +61,11 @@ pub fn run(
   })
 }
 
+// TODO: checkmate
+// castling
+
+// moves
+// one in all directions
 fn king_moves(piece: piece.Piece, ctx: Context) -> List(Move) {
   [
     Up(1),
@@ -73,11 +78,15 @@ fn king_moves(piece: piece.Piece, ctx: Context) -> List(Move) {
     BottomLeft(1),
   ]
   |> list.filter_map(fn(command) {
-    use _, occupant <- check_command(piece, command, ctx)
+    use _, occupant <- check_command(piece, command, ctx, always_move)
     occupant.color != piece.color
   })
 }
 
+// moves
+// 1. first => 2/1
+// 2. rest => 1
+// 3. diagonal => when occupied by opponent
 fn pawn_moves(piece: piece.Piece, ctx: Context) -> List(Move) {
   let pos = parse(piece.pos)
 
@@ -89,12 +98,26 @@ fn pawn_moves(piece: piece.Piece, ctx: Context) -> List(Move) {
     ]
     False -> [pawn_forward_command(piece, 1)]
   }
+  |> list.append(pawn_take_command(piece))
   |> list.filter_map(fn(command) {
-    use command, occupant <- check_command(piece, command, ctx)
+    use command, occupant <- check_command(
+      piece,
+      command,
+      ctx,
+      fn(command, occupant) {
+        case command {
+          Up(_) | Down(_) | Left(_) | Right(_) -> True
+          _ -> {
+            option.map(occupant, fn(oc) { oc.color != piece.color })
+            |> option.unwrap(False)
+          }
+        }
+      },
+    )
 
     case command {
       Up(_) | Down(_) | Left(_) | Right(_) -> False
-      _ -> occupant.color == piece.color
+      _ -> occupant.color != piece.color
     }
   })
 }
@@ -108,7 +131,7 @@ fn new_or_append(
   check_result: CheckResult,
   pos: String,
   occupant: option.Option(piece.Piece),
-) {
+) -> CheckResult {
   case check_result {
     Pass(current, _) -> Pass(list.append([pos], current), occupant)
     _ -> Pass([pos], occupant)
@@ -124,28 +147,46 @@ fn check_command(
   piece: piece.Piece,
   command: MoveCommand,
   ctx: Context,
+  movable_when: fn(MoveCommand, option.Option(piece.Piece)) -> Bool,
   take_when: fn(MoveCommand, piece.Piece) -> Bool,
-) {
+) -> Result(Move, Nil) {
   let outcome =
     list.fold_until(expand(command), Fail, fn(acc, command_part) {
-      let result_pos = move_with(piece, command_part)
+      {
+        use result_pos <- result.try(move_with(piece, command_part))
+        use <- bool.guard(reached_boundary(result_pos), Error(Nil))
 
-      use <- bool.guard(reached_boundary(result_pos), list.Stop(Fail))
+        // TODO: need to figure out how to move knight
+        case dict.get(ctx.occupancy, serialize(result_pos)) {
+          Ok(occupant) -> {
+            use <- bool.guard(
+              !movable_when(command, option.Some(occupant)),
+              list.Stop(Fail),
+            )
+            use <- bool.guard(!take_when(command, occupant), list.Stop(Fail))
 
-      // TODO: need to figure out how to move knight
-      case dict.get(ctx.occupancy, serialize(result_pos)) {
-        Ok(occupant) -> {
-          use <- bool.guard(!take_when(command, occupant), list.Stop(Fail))
+            list.Continue(new_or_append(
+              acc,
+              result_pos |> serialize,
+              option.Some(occupant),
+            ))
+          }
+          _ -> {
+            use <- bool.guard(
+              !movable_when(command, option.None),
+              list.Stop(Fail),
+            )
 
-          list.Continue(new_or_append(
-            acc,
-            result_pos |> serialize,
-            option.Some(occupant),
-          ))
+            list.Continue(new_or_append(
+              acc,
+              result_pos |> serialize,
+              option.None,
+            ))
+          }
         }
-        _ ->
-          list.Continue(new_or_append(acc, result_pos |> serialize, option.None))
+        |> Ok
       }
+      |> result.unwrap(list.Stop(Fail))
     })
 
   case outcome {
@@ -155,7 +196,10 @@ fn check_command(
 }
 
 /// move a piece from it's current position to next one with a command
-fn move_with(piece: piece.Piece, command: MoveCommand) -> #(String, Int) {
+fn move_with(
+  piece: piece.Piece,
+  command: MoveCommand,
+) -> Result(#(String, Int), Nil) {
   let pos = parse(piece.pos)
 
   let file_to_rank = make_file_to_rank()
@@ -167,52 +211,47 @@ fn move_with(piece: piece.Piece, command: MoveCommand) -> #(String, Int) {
         Up(_) -> pos.1 + step
         _ -> pos.1 - step
       })
+      |> Ok
     }
 
     Left(step) | Right(step) -> {
-      let assert Ok(file) =
-        dict.get(file_to_rank, pos.0)
-        |> result.map(fn(rank) {
-          case command {
-            Right(_) -> rank + step
-            _ -> rank - step
-          }
-        })
-        |> result.try(dict.get(rank_to_file, _))
-
-      #(file, pos.1)
+      dict.get(file_to_rank, pos.0)
+      |> result.map(fn(rank) {
+        case command {
+          Right(_) -> rank + step
+          _ -> rank - step
+        }
+      })
+      |> result.try(dict.get(rank_to_file, _))
+      |> result.map(fn(file) { #(file, pos.1) })
     }
 
     TopLeft(step) | TopRight(step) -> {
       let rank = pos.1 + step
 
-      let assert Ok(file) =
-        dict.get(file_to_rank, pos.0)
-        |> result.map(fn(r) {
-          case command {
-            TopRight(_) -> r + step
-            _ -> r - step
-          }
-        })
-        |> result.try(dict.get(rank_to_file, _))
-
-      #(file, rank)
+      dict.get(file_to_rank, pos.0)
+      |> result.map(fn(r) {
+        case command {
+          TopRight(_) -> r + step
+          _ -> r - step
+        }
+      })
+      |> result.try(dict.get(rank_to_file, _))
+      |> result.map(fn(file) { #(file, rank) })
     }
 
     BottomLeft(step) | BottomRight(step) -> {
       let rank = pos.1 - step
 
-      let assert Ok(file) =
-        dict.get(file_to_rank, pos.0)
-        |> result.map(fn(r) {
-          case command {
-            BottomRight(_) -> r + step
-            _ -> r - step
-          }
-        })
-        |> result.try(dict.get(rank_to_file, _))
-
-      #(file, rank)
+      dict.get(file_to_rank, pos.0)
+      |> result.map(fn(r) {
+        case command {
+          BottomRight(_) -> r + step
+          _ -> r - step
+        }
+      })
+      |> result.try(dict.get(rank_to_file, _))
+      |> result.map(fn(file) { #(file, rank) })
     }
   }
 }
@@ -239,7 +278,7 @@ fn expand(command: MoveCommand) -> List(MoveCommand) {
 fn parse(pos: String) {
   let parts = string.split(pos, "")
   let assert Ok(file) = parts |> list.first
-  let assert Ok(rank) = parts |> list.last |> result.try(fn(v) { int.parse(v) })
+  let assert Ok(rank) = parts |> list.last |> result.try(int.parse)
   #(file, rank)
 }
 
@@ -281,4 +320,18 @@ fn pawn_forward_command(piece: piece.Piece, step: Int) -> MoveCommand {
     True -> Up(step)
     False -> Down(step)
   }
+}
+
+fn pawn_take_command(piece: piece.Piece) -> List(MoveCommand) {
+  case piece.color == piece.White {
+    True -> [TopLeft(1), TopRight(1)]
+    False -> [BottomLeft(1), BottomRight(1)]
+  }
+}
+
+fn always_move(
+  _command: MoveCommand,
+  _occupant: option.Option(piece.Piece),
+) -> Bool {
+  True
 }
