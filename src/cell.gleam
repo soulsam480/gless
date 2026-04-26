@@ -15,7 +15,7 @@ pub type CellProps {
 
 pub fn render(props: CellProps) {
   {
-    use props <- component.render_result(component.new())
+    use props <- component.try_render(component.new())
 
     use CellProps(on_x, el, board_state) <- result.try(option.to_result(
       props,
@@ -95,7 +95,7 @@ pub fn render(props: CellProps) {
         _ -> Nil
       }
     })
-    |> vnode.wrap_if_signal(piece, render: fn(piece) {
+    |> vnode.child_if_signal(piece, render: fn(piece) {
       piece.new(piece, is_focused, handle: fn(p) {
         signal.setter(board_state, fn(prev) {
           prev

@@ -79,7 +79,7 @@ pub fn new(
   handle on_click: fn(Piece) -> a,
 ) {
   {
-    use props <- component.render_result(component.new())
+    use props <- component.try_render(component.new())
     use #(piece, on_click) <- result.try(option.to_result(props, Nil))
 
     vnode.new("div")

@@ -56,15 +56,15 @@ pub fn empty() -> VNode {
   VNode("$NULL", [], [])
 }
 
-pub fn wrap_if_signal(
+pub fn child_if_signal(
   vnode: VNode,
   when: signal.Signal(option.Option(a)),
   render render: fn(a) -> VNode,
 ) -> VNode {
-  wrap_ternary_signal(vnode, when, render, empty)
+  child_ternary_signal(vnode, when, render, empty)
 }
 
-pub fn wrap_ternary_signal(
+pub fn child_ternary_signal(
   vnode: VNode,
   when: signal.Signal(option.Option(a)),
   render render: fn(a) -> VNode,
@@ -96,7 +96,7 @@ pub fn text(vnode: VNode, text: String) -> VNode {
   )
 }
 
-pub fn text_with_arg(vnode: VNode, text: String, args: List(String)) -> VNode {
+pub fn text_with(vnode: VNode, text: String, args: List(String)) -> VNode {
   VNode(
     ..vnode,
     children: list.append(vnode.children, [

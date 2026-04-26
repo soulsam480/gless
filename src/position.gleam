@@ -41,6 +41,9 @@ pub fn possible(
   case piece.kind {
     piece.King -> king_moves(piece, ctx)
     piece.Pawn(_) -> pawn_moves(piece, ctx)
+    piece.BishopL | piece.BishopR -> bishop_moves(piece, ctx)
+    piece.RookL | piece.RookR -> rook_moves(piece, ctx)
+    piece.Queen -> queen_moves(piece, ctx)
     _ -> []
   }
 }
@@ -83,6 +86,24 @@ fn king_moves(piece: piece.Piece, ctx: Context) -> List(Move) {
   })
 }
 
+fn queen_moves(piece: piece.Piece, ctx: Context) {
+  [
+    Right(7),
+    Left(7),
+    Up(7),
+    Down(7),
+    TopRight(7),
+    TopLeft(7),
+    BottomRight(7),
+    BottomLeft(7),
+  ]
+  |> list.flat_map(expand)
+  |> list.filter_map(fn(command) {
+    use _, occupant <- check_command(piece, command, ctx, always_move)
+    occupant.color != piece.color
+  })
+}
+
 // moves
 // 1. first => 2/1
 // 2. rest => 1
@@ -119,6 +140,34 @@ fn pawn_moves(piece: piece.Piece, ctx: Context) -> List(Move) {
       Up(_) | Down(_) | Left(_) | Right(_) -> False
       _ -> occupant.color != piece.color
     }
+  })
+}
+
+fn bishop_moves(piece: piece.Piece, ctx: Context) {
+  [
+    TopRight(7),
+    TopLeft(7),
+    BottomRight(7),
+    BottomLeft(7),
+  ]
+  |> list.flat_map(expand)
+  |> list.filter_map(fn(command) {
+    use _, occupant <- check_command(piece, command, ctx, always_move)
+    occupant.color != piece.color
+  })
+}
+
+fn rook_moves(piece: piece.Piece, ctx: Context) {
+  [
+    Right(7),
+    Left(7),
+    Up(7),
+    Down(7),
+  ]
+  |> list.flat_map(expand)
+  |> list.filter_map(fn(command) {
+    use _, occupant <- check_command(piece, command, ctx, always_move)
+    occupant.color != piece.color
   })
 }
 

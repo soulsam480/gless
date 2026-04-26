@@ -20,7 +20,8 @@ pub fn render(
   Component(render: factory)
 }
 
-pub fn render_result(
+/// a component that can render empty node
+pub fn try_render(
   for _component: Component(p),
   with factory: fn(p) -> Result(vnode.VNode, e),
 ) -> Component(p) {
