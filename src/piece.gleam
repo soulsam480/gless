@@ -76,6 +76,7 @@ pub fn color_str(piece: Piece) -> String {
 pub fn new(
   piece: Piece,
   is_focused: signal.Signal(Bool),
+  is_in_path: signal.Signal(Bool),
   handle on_click: fn(Piece) -> a,
 ) {
   {
@@ -96,12 +97,15 @@ pub fn new(
         |> string.replace("white", ""),
     )
     |> vnode.prop("data-pos", piece.pos)
-    |> vnode.signal_prop(
-      "data-focused",
-      signal.computed(fn() { signal.value(is_focused) |> bool.to_string }),
-    )
+    |> vnode.signal_prop("data-focused", signal.map(is_focused, bool.to_string))
     |> vnode.on("click", fn(e) {
-      e |> dom.event_stop_propagation
+      case signal.peek(is_in_path) {
+        False -> e |> dom.event_stop_propagation
+        True -> {
+          Nil
+        }
+      }
+
       on_click(piece)
       Nil
     })

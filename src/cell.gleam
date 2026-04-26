@@ -96,13 +96,24 @@ pub fn render(props: CellProps) {
       }
     })
     |> vnode.child_if_signal(piece, render: fn(piece) {
-      piece.new(piece, is_focused, handle: fn(p) {
+      piece.new(piece, is_focused, is_in_path, handle: fn(p) {
         signal.setter(board_state, fn(prev) {
-          prev
-          |> state.set_focused(state.FocusState(
-            piece,
-            moves: position.possible(p, { board_state |> signal.value }.pieces),
-          ))
+          case signal.value(is_in_path) {
+            True -> {
+              prev
+            }
+
+            False -> {
+              prev
+              |> state.set_focused(state.FocusState(
+                piece,
+                moves: position.possible(
+                  p,
+                  { board_state |> signal.value }.pieces,
+                ),
+              ))
+            }
+          }
         })
       })
     })
