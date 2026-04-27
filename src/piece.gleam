@@ -109,6 +109,7 @@ pub fn new(
       on_click(piece)
       Nil
     })
+    |> vnode.children([piece_icon(color_str(piece), to_string(piece))])
     |> Ok
   }
   |> component.to_vnode(option.Some(#(piece, on_click)))
@@ -167,3 +168,6 @@ fn default_pos(color: Color, kind: PieceKind) -> String {
     }
   }
 }
+
+@external(javascript, "./piece_ffi.ts", "render_piece_icon")
+fn piece_icon(color: String, piece: String) -> vnode.VNode

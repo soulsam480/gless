@@ -27,6 +27,7 @@ import {
 	VNode$VNode$props,
 	VNode$VNode$tag,
 } from "@/chess/preact/vnode.mjs";
+import { CustomType } from "@/gleam_std/gleam.mjs";
 
 /**
  * @param {string} str
@@ -96,7 +97,13 @@ function serializeChildren(children) {
 		.toArray()
 		.map((child) => {
 			if (Children$isNode(child)) {
-				return h(Children$Node$child(child));
+				const inner = Children$Node$child(child);
+
+				if (inner instanceof CustomType) {
+					return h(inner);
+				}
+
+				return inner;
 			}
 
 			if (Children$isNodeSignal(child)) {
