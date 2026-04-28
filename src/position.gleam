@@ -27,7 +27,11 @@ pub type Move {
 }
 
 type Context {
-  Context(pieces: List(piece.Piece), occupancy: dict.Dict(String, piece.Piece))
+  Context(
+    piece: piece.Piece,
+    pieces: List(piece.Piece),
+    occupancy: dict.Dict(String, piece.Piece),
+  )
 }
 
 pub fn possible(
@@ -36,14 +40,14 @@ pub fn possible(
 ) -> List(Move) {
   let occupancy_map = make_occupancy(pieces)
 
-  let ctx = Context(pieces:, occupancy: occupancy_map)
+  let ctx = Context(piece:, pieces:, occupancy: occupancy_map)
 
   case piece.kind {
-    piece.King -> king_moves(piece, ctx)
-    piece.Pawn(_) -> pawn_moves(piece, ctx)
-    piece.BishopL | piece.BishopR -> bishop_moves(piece, ctx)
-    piece.RookL | piece.RookR -> rook_moves(piece, ctx)
-    piece.Queen -> queen_moves(piece, ctx)
+    piece.King -> king_moves(ctx)
+    piece.Pawn(_) -> pawn_moves(ctx)
+    piece.BishopL | piece.BishopR -> bishop_moves(ctx)
+    piece.RookL | piece.RookR -> rook_moves(ctx)
+    piece.Queen -> queen_moves(ctx)
     _ -> []
   }
 }
@@ -69,7 +73,7 @@ pub fn run(
 
 // moves
 // one in all directions
-fn king_moves(piece: piece.Piece, ctx: Context) -> List(Move) {
+fn king_moves(ctx: Context) -> List(Move) {
   [
     Up(1),
     Down(1),
@@ -80,13 +84,12 @@ fn king_moves(piece: piece.Piece, ctx: Context) -> List(Move) {
     BottomRight(1),
     BottomLeft(1),
   ]
-  |> list.filter_map(fn(command) {
-    use _, occupant <- check_command(piece, command, ctx, always_move)
-    occupant.color != piece.color
+  |> list.fold([], fn(acc, command) {
+    accumulate_moves(acc, command, ctx, always_move, always_take_opponent)
   })
 }
 
-fn queen_moves(piece: piece.Piece, ctx: Context) {
+fn queen_moves(ctx: Context) {
   [
     Right(7),
     Left(7),
@@ -98,9 +101,8 @@ fn queen_moves(piece: piece.Piece, ctx: Context) {
     BottomLeft(7),
   ]
   |> list.flat_map(expand)
-  |> list.filter_map(fn(command) {
-    use _, occupant <- check_command(piece, command, ctx, always_move)
-    occupant.color != piece.color
+  |> list.fold([], fn(acc, command) {
+    accumulate_moves(acc, command, ctx, always_move, always_take_opponent)
   })
 }
 
@@ -108,7 +110,8 @@ fn queen_moves(piece: piece.Piece, ctx: Context) {
 // 1. first => 2/1
 // 2. rest => 1
 // 3. diagonal => when occupied by opponent
-fn pawn_moves(piece: piece.Piece, ctx: Context) -> List(Move) {
+fn pawn_moves(ctx: Context) -> List(Move) {
+  let piece = ctx.piece
   let pos = parse(piece.pos)
 
   // pawn can move 1/2 places if it's not moved yet
@@ -120,9 +123,9 @@ fn pawn_moves(piece: piece.Piece, ctx: Context) -> List(Move) {
     False -> [pawn_forward_command(piece, 1)]
   }
   |> list.append(pawn_take_command(piece))
-  |> list.filter_map(fn(command) {
-    use command, occupant <- check_command(
-      piece,
+  |> list.fold([], fn(acc, command) {
+    use command, piece, occupant <- accumulate_moves(
+      acc,
       command,
       ctx,
       fn(command, occupant) {
@@ -143,7 +146,7 @@ fn pawn_moves(piece: piece.Piece, ctx: Context) -> List(Move) {
   })
 }
 
-fn bishop_moves(piece: piece.Piece, ctx: Context) {
+fn bishop_moves(ctx: Context) {
   [
     TopRight(7),
     TopLeft(7),
@@ -151,13 +154,12 @@ fn bishop_moves(piece: piece.Piece, ctx: Context) {
     BottomLeft(7),
   ]
   |> list.flat_map(expand)
-  |> list.filter_map(fn(command) {
-    use _, occupant <- check_command(piece, command, ctx, always_move)
-    occupant.color != piece.color
+  |> list.fold([], fn(acc, command) {
+    accumulate_moves(acc, command, ctx, always_move, always_take_opponent)
   })
 }
 
-fn rook_moves(piece: piece.Piece, ctx: Context) {
+fn rook_moves(ctx: Context) {
   [
     Right(7),
     Left(7),
@@ -165,9 +167,8 @@ fn rook_moves(piece: piece.Piece, ctx: Context) {
     Down(7),
   ]
   |> list.flat_map(expand)
-  |> list.filter_map(fn(command) {
-    use _, occupant <- check_command(piece, command, ctx, always_move)
-    occupant.color != piece.color
+  |> list.fold([], fn(acc, command) {
+    accumulate_moves(acc, command, ctx, always_move, always_take_opponent)
   })
 }
 
@@ -182,7 +183,9 @@ fn new_or_append(
   occupant: option.Option(piece.Piece),
 ) -> CheckResult {
   case check_result {
-    Pass(current, _) -> Pass(list.append([pos], current), occupant)
+    Pass(current, _) ->
+      // NOTE: reverse the current positions to make them incremental in order
+      Pass(list.append([pos], current) |> list.reverse, occupant)
     _ -> Pass([pos], occupant)
   }
 }
@@ -192,13 +195,15 @@ fn new_or_append(
 /// 2. then for each command move the piece and check if it has reached boundary
 /// 3. then check if we have an occupant on the next position
 /// 4. based on take_when, we know if we can cross this or take this
-fn check_command(
-  piece: piece.Piece,
+fn accumulate_moves(
+  accumulator: List(Move),
   command: MoveCommand,
   ctx: Context,
   movable_when: fn(MoveCommand, option.Option(piece.Piece)) -> Bool,
-  take_when: fn(MoveCommand, piece.Piece) -> Bool,
-) -> Result(Move, Nil) {
+  take_when: fn(MoveCommand, piece.Piece, piece.Piece) -> Bool,
+) -> List(Move) {
+  let piece = ctx.piece
+
   let outcome =
     list.fold_until(expand(command), Fail, fn(acc, command_part) {
       {
@@ -212,9 +217,13 @@ fn check_command(
               !movable_when(command, option.Some(occupant)),
               list.Stop(Fail),
             )
-            use <- bool.guard(!take_when(command, occupant), list.Stop(Fail))
 
-            list.Continue(new_or_append(
+            use <- bool.guard(
+              !take_when(command, piece, occupant),
+              list.Stop(Fail),
+            )
+
+            list.Stop(new_or_append(
               acc,
               result_pos |> serialize,
               option.Some(occupant),
@@ -239,8 +248,13 @@ fn check_command(
     })
 
   case outcome {
-    Fail -> Error(Nil)
-    Pass(pos, take) -> Ok(Move(pos, list.last(pos) |> result.unwrap(""), take:))
+    Fail -> accumulator
+    Pass(pos, take) -> {
+      list.prepend(
+        accumulator,
+        Move(pos, list.last(pos) |> result.unwrap(""), take:),
+      )
+    }
   }
 }
 
@@ -309,19 +323,24 @@ fn move_with(
 /// singular ones. this way we can see if a move
 /// can be stopped by an occupant
 fn expand(command: MoveCommand) -> List(MoveCommand) {
-  use <- bool.guard(command.step == 1, [command])
-  use acc, curr <- int.range(1, command.step + 1, [])
+  {
+    use <- bool.guard(command.step == 1, [command])
+    use acc, curr <- int.range(1, command.step + 1, [])
 
-  list.prepend(acc, case command {
-    Up(_) -> Up(curr)
-    Down(_) -> Down(curr)
-    Left(_) -> Left(curr)
-    Right(_) -> Right(curr)
-    TopLeft(_) -> TopLeft(curr)
-    TopRight(_) -> TopRight(curr)
-    BottomLeft(_) -> BottomLeft(curr)
-    BottomRight(_) -> BottomRight(curr)
-  })
+    list.prepend(acc, case command {
+      Up(_) -> Up(curr)
+      Down(_) -> Down(curr)
+      Left(_) -> Left(curr)
+      Right(_) -> Right(curr)
+      TopLeft(_) -> TopLeft(curr)
+      TopRight(_) -> TopRight(curr)
+      BottomLeft(_) -> BottomLeft(curr)
+      BottomRight(_) -> BottomRight(curr)
+    })
+  }
+  // NOTE: reverse the command to make them incremental
+  // in order
+  |> list.reverse
 }
 
 fn parse(pos: String) {
@@ -383,4 +402,12 @@ fn always_move(
   _occupant: option.Option(piece.Piece),
 ) -> Bool {
   True
+}
+
+fn always_take_opponent(
+  _command: MoveCommand,
+  piece: piece.Piece,
+  occupant: piece.Piece,
+) {
+  piece.color != occupant.color
 }

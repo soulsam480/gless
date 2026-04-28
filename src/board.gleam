@@ -1,5 +1,4 @@
 import cell
-import dimension
 import dom
 import gleam/bool
 import gleam/list
@@ -9,7 +8,6 @@ import preact/component
 import preact/signal
 import preact/vnode
 import state
-import utils
 
 pub fn render_board() -> component.PreactComponent {
   let board_state =
@@ -28,10 +26,6 @@ pub fn render_board() -> component.PreactComponent {
 
   vnode.new("div")
   |> vnode.prop("class", "wrapper")
-  |> vnode.prop(
-    "style",
-    utils.format("--cell-size: {};", [dimension.cell_size]),
-  )
   |> vnode.children(
     list.map(position.y_axis, fn(el) {
       vnode.new("div")

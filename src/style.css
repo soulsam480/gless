@@ -19,6 +19,8 @@
 	--highlight-last-move: oklch(78% 0.07 220 / 45%);
 
 	--background: oklch(0.9 0.09 81.66 / 0.79);
+
+	--cell-size: 12.5cqi; /* 100cqi / 8 columns = 12.5cqi */
 }
 
 @keyframes pulse {
@@ -31,6 +33,10 @@
 	border: 1px solid var(--board-border);
 	border-radius: 4px;
 	overflow: hidden;
+	width: min(90vw, 90vh);
+	max-width: 640px;
+	aspect-ratio: 1 / 1;
+	container-type: inline-size; /* enables cqi */
 }
 
 .cell {
@@ -53,6 +59,7 @@
 	position: absolute;
 	content: "";
 	animation: var(--animate-pulse);
+	cursor: pointer;
 }
 
 .cell:has([data-focused="True"]) {
@@ -88,6 +95,7 @@
 	display: flex;
 	align-items: center;
 	justify-content: center;
+	cursor: pointer;
 }
 
 .piece[data-color="black"] {
