@@ -1,3 +1,4 @@
+import "preact/debug";
 import "./style.css";
 
 import { render } from "preact";

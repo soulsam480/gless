@@ -16,8 +16,13 @@ pub type Color {
   White
 }
 
+/// Any kind of state on a piece outside position
+pub type Flags {
+  Flags(taken: Bool, moved: Bool)
+}
+
 pub type Piece {
-  Piece(color: Color, kind: PieceKind, pos: String)
+  Piece(color: Color, kind: PieceKind, pos: String, flags: Flags)
 }
 
 pub type PieceKind {
@@ -34,18 +39,23 @@ pub type PieceKind {
 
 pub fn of(color: Color) -> List(Piece) {
   [
-    Piece(color, King, default_pos(color, King)),
-    Piece(color, Queen, default_pos(color, Queen)),
-    Piece(color, BishopL, default_pos(color, BishopL)),
-    Piece(color, BishopR, default_pos(color, BishopR)),
-    Piece(color, KnightL, default_pos(color, KnightL)),
-    Piece(color, KnightR, default_pos(color, KnightR)),
-    Piece(color, RookL, default_pos(color, RookL)),
-    Piece(color, RookR, default_pos(color, RookR)),
+    Piece(color, King, default_pos(color, King), new_flag()),
+    Piece(color, Queen, default_pos(color, Queen), new_flag()),
+    Piece(color, BishopL, default_pos(color, BishopL), new_flag()),
+    Piece(color, BishopR, default_pos(color, BishopR), new_flag()),
+    Piece(color, KnightL, default_pos(color, KnightL), new_flag()),
+    Piece(color, KnightR, default_pos(color, KnightR), new_flag()),
+    Piece(color, RookL, default_pos(color, RookL), new_flag()),
+    Piece(color, RookR, default_pos(color, RookR), new_flag()),
   ]
   |> int.range(1, 9, _, fn(acc, curr) {
     acc
-    |> list.prepend(Piece(color, Pawn(curr), default_pos(color, Pawn(curr))))
+    |> list.prepend(Piece(
+      color,
+      Pawn(curr),
+      default_pos(color, Pawn(curr)),
+      new_flag(),
+    ))
   })
 }
 
@@ -109,7 +119,7 @@ pub fn new(
       on_click(piece)
       Nil
     })
-    |> vnode.children([piece_icon(color_str(piece), to_string(piece))])
+    |> vnode.child(piece_icon(color_str(piece), to_string(piece)))
     |> Ok
   }
   |> component.to_vnode(option.Some(#(piece, on_click)))
@@ -171,3 +181,15 @@ fn default_pos(color: Color, kind: PieceKind) -> String {
 
 @external(javascript, "./piece_ffi.ts", "render_piece_icon")
 fn piece_icon(color: String, piece: String) -> vnode.VNode
+
+fn new_flag() -> Flags {
+  Flags(taken: False, moved: False)
+}
+
+pub fn taken(flags: Flags) -> Flags {
+  Flags(..flags, taken: True)
+}
+
+pub fn moved(flags: Flags) -> Flags {
+  Flags(..flags, moved: True)
+}

@@ -17,7 +17,7 @@ export function render_piece_icon(
 	return h(Piece, {
 		color: color === "white" ? "black" : "white",
 		piece: ID_TO_PIECE[piece.replace(/black|white/, "").split("_")[0]],
-		width: "calc(var(--cell-size) * 0.45)",
+		width: "calc(var(--piece-size, var(--size)) * 0.9)",
 		fillColor: "currentColor",
 	});
 }

@@ -58,14 +58,23 @@ pub fn run(
   with_other pieces: List(piece.Piece),
 ) -> List(piece.Piece) {
   list.fold(pieces, [], fn(acc, curr) {
-    use <- bool.guard(option.is_some(move.take) && move.final == curr.pos, acc)
+    // delete taken piece
+    use <- bool.guard(
+      option.is_some(move.take) && move.final == curr.pos,
+      acc |> list.prepend(piece.Piece(..curr, flags: piece.taken(piece.flags))),
+    )
 
+    // keep every other piece
     use <- bool.guard(
       piece.to_string(curr) != piece.to_string(piece),
       list.prepend(acc, curr),
     )
 
-    list.prepend(acc, piece.Piece(..curr, pos: move.final))
+    // move current piece to the final position
+    list.prepend(
+      acc,
+      piece.Piece(..curr, pos: move.final, flags: piece.moved(piece.flags)),
+    )
   })
 }
 
@@ -432,6 +441,8 @@ fn reached_boundary(pos: #(String, Int)) -> Bool {
 
 fn make_occupancy(pieces: List(piece.Piece)) -> dict.Dict(String, piece.Piece) {
   list.fold(pieces, dict.new(), fn(acc, curr) {
+    use <- bool.guard(curr.flags.taken, acc)
+
     dict.insert(acc, curr.pos, curr)
   })
 }

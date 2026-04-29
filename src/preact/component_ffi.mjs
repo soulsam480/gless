@@ -1,17 +1,21 @@
 // @ts-check
+// d
 
+import { computed } from "@preact/signals";
 import { Show } from "@preact/signals/utils";
-import { h as preact_h } from "preact";
+import { Fragment, h as preact_h } from "preact";
 import {
+	Children$ConditionalNodeSignal$else_render,
+	Children$ConditionalNodeSignal$state,
+	Children$ConditionalNodeSignal$then_render,
+	Children$isConditionalNodeSignal,
 	Children$isNode,
 	Children$isNodeSignal,
 	Children$isText,
 	Children$isTextArgs,
 	Children$isTextSignal,
 	Children$Node$child,
-	Children$NodeSignal$else_render,
-	Children$NodeSignal$state,
-	Children$NodeSignal$then_render,
+	Children$NodeSignal$child,
 	Children$Text$child,
 	Children$TextArgs$args,
 	Children$TextArgs$child,
@@ -45,10 +49,15 @@ function camelCase(str) {
  * @returns {import('preact').ComponentChildren}
  */
 export function h(node) {
-	const tag = VNode$VNode$tag(node);
+	/** @type {import('preact').FunctionComponent | string} */
+	let tag = VNode$VNode$tag(node);
 
 	if (tag === "$NULL") {
 		return null;
+	}
+
+	if (tag === "$FRAGMENT") {
+		tag = Fragment;
 	}
 
 	return preact_h(
@@ -106,10 +115,10 @@ function serializeChildren(children) {
 				return inner;
 			}
 
-			if (Children$isNodeSignal(child)) {
-				const state = Children$NodeSignal$state(child);
-				const then_render = Children$NodeSignal$then_render(child);
-				const else_render = Children$NodeSignal$else_render(child);
+			if (Children$isConditionalNodeSignal(child)) {
+				const state = Children$ConditionalNodeSignal$state(child);
+				const then_render = Children$ConditionalNodeSignal$then_render(child);
+				const else_render = Children$ConditionalNodeSignal$else_render(child);
 
 				return preact_h(Show, {
 					when: state,
@@ -133,6 +142,10 @@ function serializeChildren(children) {
 
 			if (Children$isText(child)) {
 				return Children$Text$child(child);
+			}
+
+			if (Children$isNodeSignal(child)) {
+				return computed(() => h(Children$NodeSignal$child(child).value));
 			}
 
 			return null;

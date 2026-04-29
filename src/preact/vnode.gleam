@@ -12,11 +12,12 @@ pub type Children {
   Text(child: String)
   TextArgs(child: String, args: List(String))
   TextSignal(child: String, args: List(signal.Signal(String)))
-  NodeSignal(
+  ConditionalNodeSignal(
     state: signal.Signal(Bool),
     then_render: fn() -> VNode,
     else_render: VNode,
   )
+  NodeSignal(child: signal.Signal(VNode))
 }
 
 pub type Prop {
@@ -45,10 +46,36 @@ pub fn on(vnode: VNode, event: String, handle: fn(dom.Event) -> Nil) -> VNode {
   VNode(..vnode, props: list.prepend(vnode.props, Handler(event:, handle:)))
 }
 
+pub fn child(vnode: VNode, child: VNode) -> VNode {
+  VNode(..vnode, children: list.append(vnode.children, [Node(child: child)]))
+}
+
 pub fn children(vnode: VNode, children: List(VNode)) -> VNode {
   VNode(
     ..vnode,
     children: list.map(children, Node(child: _)) |> list.append(vnode.children),
+  )
+}
+
+pub fn signal_child(vnode: VNode, child: signal.Signal(VNode)) -> VNode {
+  VNode(..vnode, children: list.append(vnode.children, [NodeSignal(child:)]))
+}
+
+pub fn signal_children(
+  vnode: VNode,
+  child: signal.Signal(List(VNode)),
+) -> VNode {
+  VNode(
+    ..vnode,
+    children: list.append(vnode.children, [
+      NodeSignal(
+        // wrap inside a fragment to match type
+        child: signal.map(child, fn(inner) {
+          new("$FRAGMENT")
+          |> children(inner)
+        }),
+      ),
+    ]),
   )
 }
 
@@ -73,7 +100,7 @@ pub fn child_ternary_signal(
   VNode(
     ..vnode,
     children: list.append(vnode.children, [
-      NodeSignal(
+      ConditionalNodeSignal(
         signal.map(when, option.is_some),
         fn() {
           case signal.value(when) {

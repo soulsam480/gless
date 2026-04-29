@@ -27,7 +27,7 @@ pub fn render(props: CellProps) {
     let piece =
       board_state
       |> signal.map(fn(state) {
-        list.find(state.pieces, fn(p) { p.pos == cell_id })
+        list.find(state.pieces, fn(p) { p.pos == cell_id && !p.flags.taken })
         |> option.from_result
       })
 
