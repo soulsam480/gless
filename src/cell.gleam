@@ -10,19 +10,19 @@ import preact/vnode
 import state
 
 pub type CellProps {
-  CellProps(on_x: String, el: String, board_state: signal.Signal(state.Board))
+  CellProps(file: String, rank: String, board_state: signal.Signal(state.Board))
 }
 
 pub fn render(props: CellProps) {
   {
     use props <- component.try_render(component.new())
 
-    use CellProps(on_x, el, board_state) <- result.try(option.to_result(
+    use CellProps(file, rank, board_state) <- result.try(option.to_result(
       props,
       Nil,
     ))
 
-    let cell_id = on_x <> el
+    let cell_id = file <> rank
 
     let piece =
       board_state
@@ -43,17 +43,6 @@ pub fn render(props: CellProps) {
         }
       })
 
-    let is_in_path =
-      board_state
-      |> signal.map(fn(state) {
-        state.focused
-        |> option.map(fn(s) {
-          s.moves
-          |> list.any(fn(m) { m.positions |> list.contains(cell_id) })
-        })
-        |> option.unwrap(False)
-      })
-
     let destination_move =
       board_state
       |> signal.map(fn(state) {
@@ -65,14 +54,22 @@ pub fn render(props: CellProps) {
         })
       })
 
+    let is_destination =
+      destination_move
+      |> signal.map(fn(move) {
+        move
+        |> option.map(fn(m) { m.final == cell_id })
+        |> option.unwrap(False)
+      })
+
     vnode.new("div")
     |> vnode.prop("class", "cell")
     |> vnode.prop("data-id", cell_id)
-    |> vnode.prop("data-row", el)
-    |> vnode.prop("data-column", on_x)
+    |> vnode.prop("data-row", rank)
+    |> vnode.prop("data-column", file)
     |> vnode.signal_prop(
       "data-is-in-path",
-      is_in_path |> signal.map(bool.to_string),
+      is_destination |> signal.map(bool.to_string),
     )
     |> vnode.on("click", fn(_) {
       case signal.peek(destination_move) {
@@ -96,21 +93,16 @@ pub fn render(props: CellProps) {
       }
     })
     |> vnode.child_if_signal(piece, render: fn(piece) {
-      piece.new(piece, is_focused, is_in_path, handle: fn(p) {
+      piece.new(piece, is_focused, is_destination, handle: fn(p) {
         signal.setter(board_state, fn(prev) {
-          case signal.value(is_in_path) {
-            True -> {
-              prev
-            }
+          case signal.value(is_destination) {
+            True -> prev
 
             False -> {
               prev
               |> state.set_focused(state.FocusState(
                 piece,
-                moves: position.possible(
-                  p,
-                  { board_state |> signal.value }.pieces,
-                ),
+                moves: position.possible(p, signal.value(board_state).pieces),
               ))
             }
           }

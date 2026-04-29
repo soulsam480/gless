@@ -27,12 +27,12 @@ pub fn render_board() -> component.PreactComponent {
   vnode.new("div")
   |> vnode.prop("class", "wrapper")
   |> vnode.children(
-    list.map(position.y_axis, fn(el) {
+    list.map(position.y_axis, fn(rank) {
       vnode.new("div")
       |> vnode.prop("class", "row")
       |> vnode.children(
-        list.map(position.x_axis, fn(on_x: String) -> vnode.VNode {
-          cell.CellProps(on_x:, el:, board_state:)
+        list.map(position.x_axis, fn(file: String) -> vnode.VNode {
+          cell.CellProps(file:, rank:, board_state:)
           |> cell.render
         }),
       )

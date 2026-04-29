@@ -48,17 +48,18 @@ pub fn possible(
     piece.BishopL | piece.BishopR -> bishop_moves(ctx)
     piece.RookL | piece.RookR -> rook_moves(ctx)
     piece.Queen -> queen_moves(ctx)
-    _ -> []
+    piece.KnightL | piece.KnightR -> knight_moves(ctx)
   }
 }
 
 pub fn run(
-  move move: Move,
+  with move: Move,
   on piece: piece.Piece,
   with_other pieces: List(piece.Piece),
 ) -> List(piece.Piece) {
   list.fold(pieces, [], fn(acc, curr) {
     use <- bool.guard(option.is_some(move.take) && move.final == curr.pos, acc)
+
     use <- bool.guard(
       piece.to_string(curr) != piece.to_string(piece),
       list.prepend(acc, curr),
@@ -128,7 +129,7 @@ fn pawn_moves(ctx: Context) -> List(Move) {
       acc,
       command,
       ctx,
-      fn(command, occupant) {
+      move: fn(command, occupant) {
         case command {
           Up(_) | Down(_) | Left(_) | Right(_) -> True
           _ -> {
@@ -140,8 +141,8 @@ fn pawn_moves(ctx: Context) -> List(Move) {
     )
 
     case command {
-      Up(_) | Down(_) | Left(_) | Right(_) -> False
-      _ -> occupant.color != piece.color
+      Up(_) | Down(_) | Left(_) | Right(_) -> Stop
+      _ -> always_take_opponent(command, piece, occupant)
     }
   })
 }
@@ -172,6 +173,72 @@ fn rook_moves(ctx: Context) {
   })
 }
 
+fn knight_moves(ctx: Context) {
+  [
+    [Up(2), Right(1)],
+    [Up(2), Left(1)],
+    [Down(2), Right(1)],
+    [Down(2), Left(1)],
+    [Left(2), Down(1)],
+    [Left(2), Up(1)],
+    [Right(2), Down(1)],
+    [Right(2), Up(1)],
+  ]
+  |> list.fold([], fn(outer, commands) {
+    // after each possible move,
+    // move the current piece to that position
+    // and then try the next command
+    let child_moves =
+      list.fold(commands, [], fn(acc, command) {
+        accumulate_moves(
+          acc,
+          command,
+          acc
+            |> list.last
+            |> result.map(fn(move) {
+              Context(..ctx, piece: piece.Piece(..ctx.piece, pos: move.final))
+            })
+            |> result.unwrap(ctx),
+          always_move,
+          always_take_regardless,
+        )
+      })
+
+    // assert that for a knight to move the L command is possible
+    use <- bool.guard(list.length(child_moves) != 2, outer)
+
+    // for the final move, take eevery possible move
+    // and merge the positions. the final position is the
+    // last position in the list of positions
+    let final_move =
+      list.fold(child_moves, Move([], "", option.None), fn(final, current) {
+        let merged_pos = list.append(final.positions, current.positions)
+
+        Move(
+          merged_pos,
+          list.last(merged_pos) |> result.unwrap(current.final),
+          current.take,
+        )
+      })
+
+    // again assert that the take on the final position is not of same color
+    use <- bool.guard(
+      final_move.take
+        |> option.map(fn(p) { p.color == ctx.piece.color })
+        |> option.unwrap(False),
+      outer,
+    )
+
+    [final_move, ..outer]
+  })
+}
+
+type TakeResult {
+  Jump
+  Take
+  Stop
+}
+
 type CheckResult {
   Pass(positions: List(String), take: option.Option(piece.Piece))
   Fail
@@ -183,9 +250,7 @@ fn new_or_append(
   occupant: option.Option(piece.Piece),
 ) -> CheckResult {
   case check_result {
-    Pass(current, _) ->
-      // NOTE: reverse the current positions to make them incremental in order
-      Pass(list.append([pos], current) |> list.reverse, occupant)
+    Pass(current, _) -> Pass(list.append(current, [pos]), occupant)
     _ -> Pass([pos], occupant)
   }
 }
@@ -199,8 +264,8 @@ fn accumulate_moves(
   accumulator: List(Move),
   command: MoveCommand,
   ctx: Context,
-  movable_when: fn(MoveCommand, option.Option(piece.Piece)) -> Bool,
-  take_when: fn(MoveCommand, piece.Piece, piece.Piece) -> Bool,
+  move movable_when: fn(MoveCommand, option.Option(piece.Piece)) -> Bool,
+  take take_when: fn(MoveCommand, piece.Piece, piece.Piece) -> TakeResult,
 ) -> List(Move) {
   let piece = ctx.piece
 
@@ -210,7 +275,6 @@ fn accumulate_moves(
         use result_pos <- result.try(move_with(piece, command_part))
         use <- bool.guard(reached_boundary(result_pos), Error(Nil))
 
-        // TODO: need to figure out how to move knight
         case dict.get(ctx.occupancy, serialize(result_pos)) {
           Ok(occupant) -> {
             use <- bool.guard(
@@ -219,8 +283,17 @@ fn accumulate_moves(
             )
 
             use <- bool.guard(
-              !take_when(command, piece, occupant),
+              take_when(command, piece, occupant) == Stop,
               list.Stop(Fail),
+            )
+
+            use <- bool.guard(
+              take_when(command, piece, occupant) == Jump,
+              list.Continue(new_or_append(
+                acc,
+                result_pos |> serialize,
+                option.Some(occupant),
+              )),
             )
 
             list.Stop(new_or_append(
@@ -250,10 +323,9 @@ fn accumulate_moves(
   case outcome {
     Fail -> accumulator
     Pass(pos, take) -> {
-      list.prepend(
-        accumulator,
-        Move(pos, list.last(pos) |> result.unwrap(""), take:),
-      )
+      // NOTE: reverse the positions to make them incremental in order
+      [Move(pos, list.last(pos) |> result.unwrap(""), take:), ..accumulator]
+      |> list.reverse
     }
   }
 }
@@ -409,5 +481,14 @@ fn always_take_opponent(
   piece: piece.Piece,
   occupant: piece.Piece,
 ) {
-  piece.color != occupant.color
+  use <- bool.guard(piece.color != occupant.color, Take)
+  Stop
+}
+
+fn always_take_regardless(
+  _command: MoveCommand,
+  _piece: piece.Piece,
+  _occupant: piece.Piece,
+) {
+  Jump
 }
