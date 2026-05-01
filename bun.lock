@@ -12,6 +12,7 @@
       },
       "devDependencies": {
         "@biomejs/biome": "^2.4.11",
+        "@preact/signals-debug": "^1.4.2",
         "@types/node": "^25.6.0",
         "ts-gleam": "^1.1.0",
         "typescript": "~6.0.2",
@@ -110,6 +111,8 @@
     "@preact/signals": ["@preact/signals@2.9.0", "", { "dependencies": { "@preact/signals-core": "^1.14.0" }, "peerDependencies": { "preact": ">= 10.25.0 || >=11.0.0-0" } }, "sha512-hYrY0KyUqkDgOl1qba/JGn6y81pXnurn21PMaxfcMwdncdZ3M/oVdmpTvEnsGjh48dIwDVc7bjWHqIsngSjYug=="],
 
     "@preact/signals-core": ["@preact/signals-core@1.14.1", "", {}, "sha512-vxPpfXqrwUe9lpjqfYNjAF/0RF/eFGeLgdJzdmIIZjpOnTmGmAB4BjWone562mJGMRP4frU6iZ6ei3PDsu52Ng=="],
+
+    "@preact/signals-debug": ["@preact/signals-debug@1.4.2", "", { "peerDependencies": { "@preact/signals": ">=2.6.0", "@preact/signals-core": ">=1.12.2", "@preact/signals-react": ">=3.6.2" }, "optionalPeers": ["@preact/signals", "@preact/signals-react"] }, "sha512-qof6mB6vHnt2CPvrhbAEGismdlPdikdmYkj8/o4pP2Jh63ZeQ3kBqQx+GsaE/byzkqVHSL5a8UYg1q+E6dbe+A=="],
 
     "@rolldown/binding-android-arm64": ["@rolldown/binding-android-arm64@1.0.0-rc.15", "", { "os": "android", "cpu": "arm64" }, "sha512-YYe6aWruPZDtHNpwu7+qAHEMbQ/yRl6atqb/AhznLTnD3UY99Q1jE7ihLSahNWkF4EqRPVC4SiR4O0UkLK02tA=="],
 

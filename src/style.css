@@ -67,6 +67,16 @@
 	background-color: var(--highlight-selected) !important;
 }
 
+.cell[data-has-check="True"] .piece {
+	border-color: red;
+	box-shadow:
+		rgb(201 63 63 / 66%) 0px 54px 55px,
+		rgb(201 63 63 / 66%) 0px -12px 30px,
+		rgb(201 63 63 / 66%) 0px 4px 6px,
+		rgb(201 63 63 / 66%) 0px 12px 13px,
+		rgb(201 63 63 / 66%) 0px -3px 5px;
+}
+
 .row {
 	display: grid;
 	grid-template-columns: repeat(8, var(--cell-size));

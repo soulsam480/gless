@@ -10,6 +10,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.11",
+    "@preact/signals-debug": "^1.4.2",
     "@types/node": "^25.6.0",
     "ts-gleam": "^1.1.0",
     "typescript": "~6.0.2",

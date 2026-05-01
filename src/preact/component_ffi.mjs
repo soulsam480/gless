@@ -2,23 +2,14 @@
 // d
 
 import { computed } from "@preact/signals";
-import { Show } from "@preact/signals/utils";
 import { Fragment, h as preact_h } from "preact";
 import {
-	Children$ConditionalNodeSignal$else_render,
-	Children$ConditionalNodeSignal$state,
-	Children$ConditionalNodeSignal$then_render,
-	Children$isConditionalNodeSignal,
 	Children$isNode,
 	Children$isNodeSignal,
 	Children$isText,
-	Children$isTextArgs,
-	Children$isTextSignal,
 	Children$Node$child,
 	Children$NodeSignal$child,
 	Children$Text$child,
-	Children$TextArgs$args,
-	Children$TextArgs$child,
 	Prop$Attr$key,
 	Prop$Attr$value,
 	Prop$AttrSignal$value,
@@ -113,31 +104,6 @@ function serializeChildren(children) {
 				}
 
 				return inner;
-			}
-
-			if (Children$isConditionalNodeSignal(child)) {
-				const state = Children$ConditionalNodeSignal$state(child);
-				const then_render = Children$ConditionalNodeSignal$then_render(child);
-				const else_render = Children$ConditionalNodeSignal$else_render(child);
-
-				return preact_h(Show, {
-					when: state,
-					children: () => h(then_render()),
-					fallback: h(else_render),
-				});
-			}
-
-			if (Children$isTextArgs(child) || Children$isTextSignal(child)) {
-				const args = Children$TextArgs$args(child).toArray();
-				const chunks = Children$TextArgs$child(child).split("{}");
-
-				return chunks.flatMap((chunk, index) => {
-					if (args[index]) {
-						return [chunk, args[index]];
-					}
-
-					return [chunk];
-				});
 			}
 
 			if (Children$isText(child)) {

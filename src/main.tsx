@@ -1,13 +1,13 @@
-import "preact/debug";
 import "./style.css";
-
 import { render } from "preact";
-import { render_board } from "./board.gleam";
+import { main as Main } from "./chess.gleam";
 
-const component = render_board();
+if (import.meta.env.DEV) {
+	await import("preact/devtools");
+}
 
 const app = document.getElementById("app");
 
 if (app) {
-	render(component, app);
+	render(<Main />, app);
 }

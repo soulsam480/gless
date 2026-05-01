@@ -2,10 +2,8 @@ import dom
 import gleam/bool
 import gleam/int
 import gleam/list
-import gleam/option
 import gleam/result
 import gleam/string
-import preact/component
 import preact/signal
 import preact/vnode
 
@@ -89,40 +87,33 @@ pub fn new(
   is_in_path: signal.Signal(Bool),
   handle on_click: fn(Piece) -> a,
 ) {
-  {
-    use props <- component.try_render(component.new())
-    use #(piece, on_click) <- result.try(option.to_result(props, Nil))
-
-    vnode.new("div")
-    |> vnode.prop("class", "piece")
-    |> vnode.prop("data-color", color_str(piece))
-    |> vnode.prop("data-kind", to_string(piece))
-    |> vnode.prop(
-      "data-title",
-      to_string(piece)
-        |> string.split("_")
-        |> list.first
-        |> result.unwrap("")
-        |> string.replace("black", "")
-        |> string.replace("white", ""),
-    )
-    |> vnode.prop("data-pos", piece.pos)
-    |> vnode.signal_prop("data-focused", signal.map(is_focused, bool.to_string))
-    |> vnode.on("click", fn(e) {
-      case signal.peek(is_in_path) {
-        False -> e |> dom.event_stop_propagation
-        True -> {
-          Nil
-        }
+  vnode.new("div")
+  |> vnode.prop("class", "piece")
+  |> vnode.prop("data-color", color_str(piece))
+  |> vnode.prop("data-kind", to_string(piece))
+  |> vnode.prop(
+    "data-title",
+    to_string(piece)
+      |> string.split("_")
+      |> list.first
+      |> result.unwrap("")
+      |> string.replace("black", "")
+      |> string.replace("white", ""),
+  )
+  |> vnode.prop("data-pos", piece.pos)
+  |> vnode.signal_prop("data-focused", signal.map(is_focused, bool.to_string))
+  |> vnode.on("click", fn(e) {
+    case signal.peek(is_in_path) {
+      False -> e |> dom.event_stop_propagation
+      True -> {
+        Nil
       }
+    }
 
-      on_click(piece)
-      Nil
-    })
-    |> vnode.child(piece_icon(color_str(piece), to_string(piece)))
-    |> Ok
-  }
-  |> component.to_vnode(option.Some(#(piece, on_click)))
+    on_click(piece)
+    Nil
+  })
+  |> vnode.child(piece_icon(color_str(piece), to_string(piece)))
 }
 
 fn default_pos(color: Color, kind: PieceKind) -> String {

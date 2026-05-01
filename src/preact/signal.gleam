@@ -17,7 +17,7 @@ pub fn set(signal: Signal(a), value: a) -> Signal(a)
 pub fn peek(signal: Signal(a)) -> a
 
 pub fn setter(signal: Signal(a), setter compute: fn(a) -> a) -> Signal(a) {
-  set(signal, compute(value(signal)))
+  set(signal, compute(peek(signal)))
 }
 
 @external(javascript, "@preact/signals", "effect")

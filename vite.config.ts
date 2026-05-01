@@ -6,7 +6,7 @@ export default defineConfig({
 	plugins: [gleam()],
 	build: {
 		target: "esnext",
-		minify: false,
+		minify: true,
 		sourcemap: true,
 	},
 	resolve: {

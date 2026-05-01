@@ -2,6 +2,7 @@ import dom
 import gleam/list
 import gleam/option
 import preact/signal
+import utils
 
 pub type VNode {
   VNode(tag: String, props: List(Prop), children: List(Children))
@@ -10,13 +11,6 @@ pub type VNode {
 pub type Children {
   Node(child: VNode)
   Text(child: String)
-  TextArgs(child: String, args: List(String))
-  TextSignal(child: String, args: List(signal.Signal(String)))
-  ConditionalNodeSignal(
-    state: signal.Signal(Bool),
-    then_render: fn() -> VNode,
-    else_render: VNode,
-  )
   NodeSignal(child: signal.Signal(VNode))
 }
 
@@ -28,6 +22,10 @@ pub type Prop {
 
 pub fn new(tag: String) -> VNode {
   VNode(tag: tag, props: [], children: [])
+}
+
+pub fn empty() -> VNode {
+  VNode("$NULL", [], [])
 }
 
 pub fn prop(vnode: VNode, key: String, value: String) -> VNode {
@@ -79,10 +77,6 @@ pub fn signal_children(
   )
 }
 
-pub fn empty() -> VNode {
-  VNode("$NULL", [], [])
-}
-
 pub fn child_if_signal(
   vnode: VNode,
   when: signal.Signal(option.Option(a)),
@@ -100,15 +94,13 @@ pub fn child_ternary_signal(
   VNode(
     ..vnode,
     children: list.append(vnode.children, [
-      ConditionalNodeSignal(
-        signal.map(when, option.is_some),
-        fn() {
-          case signal.value(when) {
+      NodeSignal(
+        signal.map(when, fn(v) {
+          case v {
             option.Some(v) -> render(v)
-            _ -> empty()
+            _ -> else_render()
           }
-        },
-        else_render(),
+        }),
       ),
     ]),
   )
@@ -127,20 +119,25 @@ pub fn text_with(vnode: VNode, text: String, args: List(String)) -> VNode {
   VNode(
     ..vnode,
     children: list.append(vnode.children, [
-      TextArgs(child: text, args:),
+      Text(child: utils.format(text, args)),
     ]),
   )
 }
 
-pub fn text_signal(
+pub fn text_signal_with(
   vnode: VNode,
-  text: String,
+  text_arg: String,
   args: List(signal.Signal(String)),
 ) -> VNode {
   VNode(
     ..vnode,
     children: list.append(vnode.children, [
-      TextSignal(child: text, args:),
+      NodeSignal(
+        child: signal.computed(fn() {
+          new("$FRAGMENT")
+          |> text(utils.format(text_arg, list.map(args, signal.value)))
+        }),
+      ),
     ]),
   )
 }
