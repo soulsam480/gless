@@ -50,7 +50,7 @@
 }
 
 [data-theme="cyberpunk"] {
-	--square-light: oklch(18% 0.03 300);
+	--square-light: oklch(0.31 0.07 298.87);
 	--square-dark: oklch(12% 0.04 290);
 	--board-border: oklch(65% 0.25 320);
 	--coord-label: oklch(65% 0.25 320);

@@ -58,24 +58,62 @@ pub fn run(
   with_other pieces: List(piece.Piece),
 ) -> List(piece.Piece) {
   list.fold(pieces, [], fn(acc, curr) {
-    // delete taken piece
-    use <- bool.guard(
-      option.is_some(move.take) && move.final == curr.pos,
-      acc |> list.prepend(piece.Piece(..curr, flags: piece.taken(piece.flags))),
-    )
+    case run_sub_move(acc, curr, move.sub) {
+      #(True, acc) -> acc
 
-    // keep every other piece
-    use <- bool.guard(
-      piece.to_string(curr) != piece.to_string(piece),
-      list.prepend(acc, curr),
-    )
+      _ -> {
+        // delete taken piece
+        use <- bool.guard(
+          option.is_some(move.take) && move.final == curr.pos,
+          acc
+            |> list.prepend(
+              piece.Piece(..curr, flags: piece.taken(piece.flags)),
+            ),
+        )
 
-    // move current piece to the final position
-    list.prepend(
-      acc,
-      piece.Piece(..curr, pos: move.final, flags: piece.moved(piece.flags)),
-    )
+        // keep every other piece
+        use <- bool.guard(
+          piece.to_string(curr) != piece.to_string(piece),
+          list.prepend(acc, curr),
+        )
+
+        // move current piece to the final position
+        list.prepend(
+          acc,
+          piece.Piece(..curr, pos: move.final, flags: piece.moved(piece.flags)),
+        )
+      }
+    }
   })
+}
+
+fn run_sub_move(
+  with acc: List(piece.Piece),
+  for curr: piece.Piece,
+  and sub: option.Option(movement.SubMove),
+) -> #(Bool, List(piece.Piece)) {
+  case sub {
+    option.Some(sub_move) -> {
+      use <- bool.guard(
+        piece.to_string(curr) != piece.to_string(sub_move.piece),
+        #(False, acc),
+      )
+
+      let acc =
+        list.prepend(
+          acc,
+          piece.Piece(
+            ..curr,
+            pos: sub_move.move.final,
+            flags: piece.moved(curr.flags),
+          ),
+        )
+
+      #(True, acc)
+    }
+
+    _ -> #(False, acc)
+  }
 }
 
 pub fn find_checks(
@@ -219,6 +257,7 @@ fn rook_moves(ctx: Context) {
       accumulate_moves(acc, command, ctx, always_move, always_take_opponent)
     })
   }.moves
+  |> castle_rook(ctx, _)
 }
 
 fn knight_moves(ctx: Context) {
@@ -548,6 +587,16 @@ fn always_take_regardless(
   Jump
 }
 
+/// check if the position is in line of fire of opponent path
+fn is_intercepting(ctx: Context, pos: #(String, Int)) -> Bool {
+  dict.filter(ctx.previous_moves, fn(p, _) {
+    !p.flags.taken && p.color != ctx.piece.color
+  })
+  |> dict.values
+  |> list.flatten
+  |> list.any(fn(move) { move.final == serialize(pos) })
+}
+
 fn king_has_check(ctx: Context, pos: #(String, Int)) -> Bool {
   use <- bool.guard(ctx.piece.kind != piece.King, False)
 
@@ -561,13 +610,84 @@ fn king_has_check(ctx: Context, pos: #(String, Int)) -> Bool {
     }
     |> result.unwrap(False)
 
-  let from_previous_moves =
-    dict.filter(ctx.previous_moves, fn(p, _) {
-      p.color != ctx.piece.color && !p.flags.taken
-    })
-    |> dict.values
-    |> list.flatten
-    |> list.any(fn(move) { move.final == serialize(pos) })
+  let from_previous_moves = is_intercepting(ctx, pos)
 
   from_current_checks || from_previous_moves
+}
+
+fn castle_rook(ctx: Context, moves: List(Move)) -> List(Move) {
+  {
+    // find my king
+    use king <- result.try(
+      ctx.pieces
+      |> list.find(fn(p) { p.kind == piece.King && p.color == ctx.piece.color }),
+    )
+
+    // don't allow castle if both have moved
+    use <- bool.guard(king.flags.moved || ctx.piece.flags.moved, Ok(moves))
+
+    // find moves for rook that can do castling
+    use castle_move <- result.try(
+      moves
+      |> list.find(fn(m) {
+        case ctx.piece.kind {
+          piece.RookL -> m.final == "d1" || m.final == "d8"
+          piece.RookR -> m.final == "f1" || m.final == "f8"
+          _ -> False
+        }
+      }),
+    )
+
+    // make sure the castling move for rook is not walking into a take from other move
+    use <- bool.guard(is_intercepting(ctx, parse(castle_move.final)), Ok(moves))
+
+    // calculate result king move after castling
+    let king_pos = case ctx.piece.kind, castle_move.final {
+      piece.RookR, "f1" -> option.Some("g1")
+      piece.RookR, "f8" -> option.Some("g8")
+      piece.RookL, "d1" -> option.Some("c1")
+      piece.RookL, "d8" -> option.Some("c8")
+
+      _, _ -> option.None
+    }
+
+    use pos <- result.try(
+      king_pos |> option.map(parse) |> option.to_result(Nil),
+    )
+
+    // then see if king is walking into a check
+    use <- bool.guard(
+      king_has_check(Context(..ctx, piece: king), pos),
+      Ok(moves),
+    )
+
+    // loop in reverse and update the rook castling move
+    // with king castling sub move
+    list.fold_right(moves, [], fn(acc, curr) {
+      case curr == castle_move {
+        True -> {
+          acc
+          |> list.prepend(
+            Move(
+              ..curr,
+              sub: movement.SubMove(
+                  piece: king,
+                  move: Move(
+                    positions: [],
+                    final: serialize(pos),
+                    take: option.None,
+                    sub: option.None,
+                  ),
+                )
+                |> option.Some,
+            ),
+          )
+        }
+
+        _ -> acc |> list.prepend(curr)
+      }
+    })
+    |> Ok
+  }
+  |> result.unwrap(moves)
 }

@@ -55,7 +55,7 @@ pub fn main() -> component.PreactComponent {
     Nil
   })
 
-  vnode.new("app")
+  vnode.new("div")
   |> vnode.children([
     theme.new(app_state),
     vnode.new("div")

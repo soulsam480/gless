@@ -71,8 +71,6 @@ pub fn render(props: CellProps) {
   vnode.new("div")
   |> vnode.prop("class", "cell")
   |> vnode.prop("data-id", cell_id)
-  |> vnode.prop("data-row", rank)
-  |> vnode.prop("data-column", file)
   |> vnode.prop("data-has-check", has_check)
   |> vnode.prop("key", cell_id)
   |> vnode.prop("data-is-in-path", is_destination)
