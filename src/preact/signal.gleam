@@ -4,6 +4,9 @@ pub type Signal(a)
 @external(javascript, "@preact/signals", "signal")
 pub fn new(state a: a) -> Signal(a)
 
+@external(javascript, "./signal_ffi.mjs", "persisted")
+pub fn new_persisted(with name: String, and initial_value: a) -> Signal(a)
+
 @external(javascript, "@preact/signals", "computed")
 pub fn computed(with fun: fn() -> a) -> Signal(a)
 

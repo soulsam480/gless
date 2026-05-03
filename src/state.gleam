@@ -5,6 +5,18 @@ import gleam/option
 import movement.{type Move}
 import piece
 
+pub type App {
+  App(theme: String)
+}
+
+pub fn new_app(theme: String) -> App {
+  App(theme:)
+}
+
+pub fn set_theme(_app: App, theme: String) -> App {
+  App(theme:)
+}
+
 pub type Board {
   Board(
     pieces: List(piece.Piece),

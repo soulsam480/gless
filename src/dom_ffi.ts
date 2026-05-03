@@ -1,9 +1,28 @@
-import { Option$None, Option$Some } from "@/gleam_std/gleam/option.mjs";
+import {
+	Option$isNone,
+	Option$isSome,
+	Option$None,
+	Option$Some,
+} from "@/gleam_std/gleam/option.mjs";
 
 /**
  * @private only for gleam compat
  */
 type THTMLElement = HTMLElement;
+
+const to_native = (value: unknown) => {
+	if (Option$isSome(value)) {
+		return value;
+	}
+
+	if (Option$isNone(value)) {
+		return;
+	}
+
+	return value;
+};
+
+const document_element = () => document.documentElement;
 
 const find = (el: string, scope: HTMLElement = document.documentElement) =>
 	scope.querySelector(el);
@@ -88,6 +107,7 @@ export {
 	add_global_listener,
 	add_listener,
 	append_child,
+	document_element,
 	event_matches,
 	event_stop_propagation,
 	find as $,
@@ -96,4 +116,5 @@ export {
 	remove,
 	set_attr,
 	type THTMLElement,
+	to_native,
 };

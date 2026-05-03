@@ -1,5 +1,4 @@
 import dom
-import gleam/bool
 import gleam/int
 import gleam/list
 import gleam/result
@@ -101,7 +100,7 @@ pub fn new(
       |> string.replace("white", ""),
   )
   |> vnode.prop("data-pos", piece.pos)
-  |> vnode.signal_prop("data-focused", signal.map(is_focused, bool.to_string))
+  |> vnode.prop("data-focused", is_focused)
   |> vnode.on("click", fn(e) {
     case signal.peek(is_in_path) {
       False -> e |> dom.event_stop_propagation

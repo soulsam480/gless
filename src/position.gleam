@@ -18,6 +18,7 @@ type Context {
     pieces: List(piece.Piece),
     occupancy: dict.Dict(String, piece.Piece),
     checks: dict.Dict(piece.Piece, List(movement.Check)),
+    previous_moves: dict.Dict(piece.Piece, List(Move)),
     file_to_rank: dict.Dict(String, Int),
     rank_to_file: dict.Dict(Int, String),
   )
@@ -28,6 +29,7 @@ pub fn possible(
   with_other pieces: List(piece.Piece),
   with_occupied occupancy: dict.Dict(String, piece.Piece),
   with_checks checks: dict.Dict(piece.Piece, List(movement.Check)),
+  with_previous_moves previous_moves: dict.Dict(piece.Piece, List(Move)),
 ) -> List(Move) {
   let ctx =
     Context(
@@ -35,6 +37,7 @@ pub fn possible(
       pieces:,
       occupancy:,
       checks:,
+      previous_moves:,
       file_to_rank: constants.make_file_to_rank(),
       rank_to_file: constants.make_rank_to_file(),
     )
@@ -258,12 +261,11 @@ fn knight_moves(ctx: Context) {
     // and merge the positions. the final position is the
     // last position in the list of positions
     let final_move =
-      list.fold(
+      list.fold_right(
         child_moves,
         Move([], "", option.None, option.None),
         fn(final, current) {
           let merged_pos = list.append(final.positions, current.positions)
-
           Move(
             merged_pos,
             list.last(merged_pos) |> result.unwrap(current.final),
@@ -308,7 +310,6 @@ fn new_or_append(
 }
 
 type MoveAccumulator {
-
   MoveAccumulator(moves: List(Move), keys: List(String))
 }
 
@@ -323,8 +324,7 @@ fn add_move(accumulator: MoveAccumulator, move: Move) -> MoveAccumulator {
   )
 
   MoveAccumulator(
-    // NOTE: reverse the positions to make them incremental in order
-    moves: list.append(accumulator.moves, [move]) |> list.reverse,
+    moves: list.prepend(accumulator.moves, move),
     keys: list.prepend(accumulator.keys, move.positions |> string.join("_")),
   )
 }
@@ -551,14 +551,23 @@ fn always_take_regardless(
 fn king_has_check(ctx: Context, pos: #(String, Int)) -> Bool {
   use <- bool.guard(ctx.piece.kind != piece.King, False)
 
-  {
-    use checks <- result.try(dict.get(ctx.checks, ctx.piece))
+  let from_current_checks =
+    {
+      use checks <- result.try(dict.get(ctx.checks, ctx.piece))
 
-    checks
-    |> list.any(fn(check) {
-      check.move.positions |> list.contains(serialize(pos))
+      checks
+      |> list.any(fn(check) { check.move.final == serialize(pos) })
+      |> Ok
+    }
+    |> result.unwrap(False)
+
+  let from_previous_moves =
+    dict.filter(ctx.previous_moves, fn(p, _) {
+      p.color != ctx.piece.color && !p.flags.taken
     })
-    |> Ok
-  }
-  |> result.unwrap(False)
+    |> dict.values
+    |> list.flatten
+    |> list.any(fn(move) { move.final == serialize(pos) })
+
+  from_current_checks || from_previous_moves
 }

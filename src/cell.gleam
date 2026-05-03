@@ -73,15 +73,9 @@ pub fn render(props: CellProps) {
   |> vnode.prop("data-id", cell_id)
   |> vnode.prop("data-row", rank)
   |> vnode.prop("data-column", file)
-  |> vnode.signal_prop(
-    "data-has-check",
-    has_check |> signal.map(bool.to_string),
-  )
+  |> vnode.prop("data-has-check", has_check)
   |> vnode.prop("key", cell_id)
-  |> vnode.signal_prop(
-    "data-is-in-path",
-    is_destination |> signal.map(bool.to_string),
-  )
+  |> vnode.prop("data-is-in-path", is_destination)
   |> vnode.on("click", fn(_) {
     case signal.peek(destination_move) {
       option.Some(move) -> {
@@ -106,6 +100,7 @@ pub fn render(props: CellProps) {
                     base.pieces,
                     base.visible_pieces,
                     signal.peek(checks),
+                    signal.peek(board_state).possible_moves,
                   ),
                 )
               }),
@@ -119,6 +114,11 @@ pub fn render(props: CellProps) {
       _ -> Nil
     }
   })
+  |> vnode.child(
+    vnode.new("span")
+    |> vnode.prop("class", "cell-id")
+    |> vnode.text(cell_id),
+  )
   |> vnode.child_if_signal(piece, render: fn(piece) {
     piece.new(piece, is_focused, is_destination, handle: fn(p) {
       signal.setter(board_state, fn(prev) {
@@ -137,6 +137,7 @@ pub fn render(props: CellProps) {
                 pieces,
                 visible_pieces,
                 signal.peek(checks),
+                prev.possible_moves,
               ),
             ))
           }

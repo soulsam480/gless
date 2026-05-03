@@ -4,19 +4,27 @@ import gleam/option
 import preact/signal
 import utils
 
+pub type Native
+
+@internal
 pub type VNode {
   VNode(tag: String, props: List(Prop), children: List(Children))
 }
 
+@internal
 pub type Children {
   Node(child: VNode)
   Text(child: String)
   NodeSignal(child: signal.Signal(VNode))
 }
 
+@internal
 pub type Prop {
-  Attr(key: String, value: String)
-  AttrSignal(key: String, value: signal.Signal(String))
+  /// NOTE: a prop can be any gleam value
+  /// we're swallowing the type here and handle
+  /// it downstram in ffi. this is done to make
+  /// the render API simple
+  Attr(key: String, value: Native)
   Handler(event: String, handle: fn(dom.Event) -> Nil)
 }
 
@@ -28,16 +36,15 @@ pub fn empty() -> VNode {
   VNode("$NULL", [], [])
 }
 
-pub fn prop(vnode: VNode, key: String, value: String) -> VNode {
-  VNode(..vnode, props: list.prepend(vnode.props, Attr(key:, value:)))
+pub fn fragment() -> VNode {
+  VNode("$FRAGMENT", [], [])
 }
 
-pub fn signal_prop(
-  vnode: VNode,
-  key: String,
-  value: signal.Signal(String),
-) -> VNode {
-  VNode(..vnode, props: list.prepend(vnode.props, AttrSignal(key:, value:)))
+pub fn prop(vnode: VNode, key: String, value: a) -> VNode {
+  VNode(
+    ..vnode,
+    props: list.prepend(vnode.props, Attr(key:, value: to_native(value))),
+  )
 }
 
 pub fn on(vnode: VNode, event: String, handle: fn(dom.Event) -> Nil) -> VNode {
@@ -69,7 +76,7 @@ pub fn signal_children(
       NodeSignal(
         // wrap inside a fragment to match type
         child: signal.map(child, fn(inner) {
-          new("$FRAGMENT")
+          fragment()
           |> children(inner)
         }),
       ),
@@ -79,15 +86,15 @@ pub fn signal_children(
 
 pub fn child_if_signal(
   vnode: VNode,
-  when: signal.Signal(option.Option(a)),
+  when condition: signal.Signal(option.Option(a)),
   render render: fn(a) -> VNode,
 ) -> VNode {
-  child_ternary_signal(vnode, when, render, empty)
+  child_ternary_signal(vnode, condition, render, empty)
 }
 
 pub fn child_ternary_signal(
   vnode: VNode,
-  when: signal.Signal(option.Option(a)),
+  when condition: signal.Signal(option.Option(a)),
   render render: fn(a) -> VNode,
   else_render else_render: fn() -> VNode,
 ) -> VNode {
@@ -95,7 +102,7 @@ pub fn child_ternary_signal(
     ..vnode,
     children: list.append(vnode.children, [
       NodeSignal(
-        signal.map(when, fn(v) {
+        signal.map(condition, fn(v) {
           case v {
             option.Some(v) -> render(v)
             _ -> else_render()
@@ -134,10 +141,13 @@ pub fn text_signal_with(
     children: list.append(vnode.children, [
       NodeSignal(
         child: signal.computed(fn() {
-          new("$FRAGMENT")
+          fragment()
           |> text(utils.format(text_arg, list.map(args, signal.value)))
         }),
       ),
     ]),
   )
 }
+
+@external(javascript, "../dom_ffi.ts", "to_native")
+pub fn to_native(value: a) -> Native

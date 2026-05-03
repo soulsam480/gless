@@ -48,3 +48,6 @@ pub fn set_attributes(
   el: HtmlElement,
   attrs: array.Array(#(String, String)),
 ) -> Nil
+
+@external(javascript, "./dom_ffi.ts", "document_element")
+pub fn document_element() -> HtmlElement

@@ -11,6 +11,7 @@ import preact/component
 import preact/signal
 import preact/vnode
 import state
+import theme
 
 pub fn main() -> component.PreactComponent {
   let board_state =
@@ -34,12 +35,15 @@ pub fn main() -> component.PreactComponent {
               state.pieces,
               state.visible_pieces,
               dict.new(),
+              state.possible_moves,
             ),
           )
         }),
       )
     })
     |> signal.new
+
+  let app_state = state.new_app("wood") |> signal.new_persisted("app_state", _)
 
   let checks =
     board_state
@@ -51,23 +55,27 @@ pub fn main() -> component.PreactComponent {
     Nil
   })
 
-  vnode.new("div")
-  |> vnode.prop("class", "wrapper")
+  vnode.new("app")
   |> vnode.children([
-    player.player(player.PlayerProps(color: "black", state: board_state)),
-    player.player(player.PlayerProps(color: "white", state: board_state)),
-  ])
-  |> vnode.children(
-    list.map(constants.y_axis, fn(rank) {
-      vnode.new("div")
-      |> vnode.prop("class", "row")
+    theme.new(app_state),
+    vnode.new("div")
+      |> vnode.prop("class", "wrapper")
+      |> vnode.children([
+        player.player(player.PlayerProps(color: "black", state: board_state)),
+        player.player(player.PlayerProps(color: "white", state: board_state)),
+      ])
       |> vnode.children(
-        list.map(constants.x_axis, fn(file: String) -> vnode.VNode {
-          cell.CellProps(file:, rank:, board_state:, checks:)
-          |> cell.render
+        list.map(constants.y_axis, fn(rank) {
+          vnode.new("div")
+          |> vnode.prop("class", "row")
+          |> vnode.children(
+            list.map(constants.x_axis, fn(file: String) -> vnode.VNode {
+              cell.CellProps(file:, rank:, board_state:, checks:)
+              |> cell.render
+            }),
+          )
         }),
-      )
-    }),
-  )
+      ),
+  ])
   |> component.to_preact
 }

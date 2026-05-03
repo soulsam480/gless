@@ -12,11 +12,9 @@ import {
 	Children$Text$child,
 	Prop$Attr$key,
 	Prop$Attr$value,
-	Prop$AttrSignal$value,
 	Prop$Handler$event,
 	Prop$Handler$handle,
 	Prop$isAttr,
-	Prop$isAttrSignal,
 	Prop$isHandler,
 	VNode$VNode$children,
 	VNode$VNode$props,
@@ -69,9 +67,8 @@ function serializeProps(props) {
 			acc,
 			prop,
 		) => {
-			if (Prop$isAttr(prop) || Prop$isAttrSignal(prop)) {
-				acc[Prop$Attr$key(prop)] =
-					Prop$Attr$value(prop) ?? Prop$AttrSignal$value(prop);
+			if (Prop$isAttr(prop)) {
+				acc[Prop$Attr$key(prop)] = Prop$Attr$value(prop);
 
 				return acc;
 			}
