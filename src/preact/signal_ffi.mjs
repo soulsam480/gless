@@ -41,9 +41,12 @@ export function persisted(name, initial) {
 
 	try {
 		const stored = localStorage.getItem(key);
-		from_local = JSON.parse(stored);
+
+		if (stored !== null) {
+			from_local = JSON.parse(stored) ?? initial;
+		}
 	} catch {
-		//
+		from_local = initial;
 	}
 
 	const sig = signal(from_local);
