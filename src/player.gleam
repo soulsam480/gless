@@ -1,12 +1,19 @@
+import gleam/int
 import gleam/list
+import gleam/option
 import gleam/string
 import piece
 import preact/signal
 import preact/vnode
 import state
+import utils
 
 pub type PlayerProps {
-  PlayerProps(color: String, state: signal.Signal(state.Board))
+  PlayerProps(
+    color: String,
+    state: signal.Signal(state.Board),
+    game_state: signal.Signal(option.Option(state.GameState)),
+  )
 }
 
 pub fn player(props: PlayerProps) {
@@ -23,12 +30,33 @@ pub fn player(props: PlayerProps) {
       })
     })
 
+  let player_name =
+    props.game_state
+    |> signal.map(fn(s) {
+      case s {
+        option.Some(state) ->
+          case props.color {
+            "white" ->
+              utils.format("{} {}", [
+                state.game.white_player,
+                format_time_left(state.white_left),
+              ])
+            _ ->
+              utils.format("{} {}", [
+                state.game.black_plyer,
+                format_time_left(state.black_left),
+              ])
+          }
+        _ -> props.color
+      }
+    })
+
   vnode.new("div")
   |> vnode.prop("class", "player")
   |> vnode.prop("data-type", props.color)
   |> vnode.children([
     vnode.new("span")
-      |> vnode.text(props.color),
+      |> vnode.text_signal(player_name),
     vnode.new("div")
       |> vnode.prop("class", "taken-pieces")
       |> vnode.signal_children(
@@ -41,4 +69,13 @@ pub fn player(props: PlayerProps) {
         ),
       ),
   ])
+}
+
+fn format_time_left(duration_seconds: Int) -> String {
+  let mins = duration_seconds / 60
+  let secs = duration_seconds % 60
+
+  mins |> int.to_string |> string.pad_start(2, "0")
+  <> ":"
+  <> secs |> int.to_string |> string.pad_start(2, "0")
 }

@@ -101,20 +101,45 @@ const event_matches = (event: Event, target: string) => {
 
 const event_stop_propagation = (event: Event) => {
 	event.stopPropagation();
+	return event;
+};
+
+const event_prevent_default = (event: Event) => {
+	event.preventDefault();
+
+	return event;
+};
+
+const form_data_from = (event: Event): Record<string, string | File> => {
+	return Object.fromEntries(
+		new FormData(event.currentTarget as HTMLFormElement).entries(),
+	);
+};
+
+const set_interval = (fun: () => void, ms: number): number => {
+	return setInterval(fun, ms);
+};
+
+const clear_interval = (id: number) => {
+	return clearInterval(id);
 };
 
 export {
 	add_global_listener,
 	add_listener,
 	append_child,
+	clear_interval,
 	document_element,
 	event_matches,
+	event_prevent_default,
 	event_stop_propagation,
 	find as $,
 	find_gl,
+	form_data_from,
 	rect,
 	remove,
 	set_attr,
+	set_interval,
 	type THTMLElement,
 	to_native,
 };

@@ -231,9 +231,27 @@ html {
 	user-select: none;
 	padding: 10px;
 	position: absolute;
-	top: 0;
+	bottom: 0;
 	right: 0;
 	display: flex;
 	gap: 4px;
 	align-items: center;
+}
+
+.game-dash {
+	padding: 10px;
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	gap: 2px;
+	display: flex;
+	flex-wrap: wrap;
+	max-width: 100vw;
+}
+
+.game-dash form {
+	display: flex;
+	gap: 4px;
+	flex-wrap: wrap;
 }

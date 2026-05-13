@@ -122,6 +122,15 @@ pub fn text(vnode: VNode, text: String) -> VNode {
   )
 }
 
+pub fn text_signal(vnode: VNode, text_sig: signal.Signal(String)) -> VNode {
+  VNode(
+    ..vnode,
+    children: list.append(vnode.children, [
+      NodeSignal(signal.map(text_sig, fn(v) { fragment() |> text(v) })),
+    ]),
+  )
+}
+
 pub fn text_with(vnode: VNode, text: String, args: List(String)) -> VNode {
   VNode(
     ..vnode,

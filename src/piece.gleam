@@ -104,9 +104,7 @@ pub fn new(
   |> vnode.on("click", fn(e) {
     case signal.peek(is_in_path) {
       False -> e |> dom.event_stop_propagation
-      True -> {
-        Nil
-      }
+      True -> e
     }
 
     on_click(piece)

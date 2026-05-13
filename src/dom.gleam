@@ -1,3 +1,4 @@
+import gleam/dynamic
 import gleam/javascript/array
 import gleam/option.{type Option}
 
@@ -41,7 +42,10 @@ pub fn listen(on: string, event: String, handle: fn(Event) -> Nil) -> Nil
 pub fn event_matches(event: Event, matches: String) -> Bool
 
 @external(javascript, "./dom_ffi.ts", "event_stop_propagation")
-pub fn event_stop_propagation(event: Event) -> Nil
+pub fn event_stop_propagation(event: Event) -> Event
+
+@external(javascript, "./dom_ffi.ts", "event_prevent_default")
+pub fn event_prevent_default(event: Event) -> Event
 
 @external(javascript, "./dom_ffi.ts", "set_attr")
 pub fn set_attributes(
@@ -51,3 +55,12 @@ pub fn set_attributes(
 
 @external(javascript, "./dom_ffi.ts", "document_element")
 pub fn document_element() -> HtmlElement
+
+@external(javascript, "./dom_ffi.ts", "form_data_from")
+pub fn form_data_from(event: Event) -> dynamic.Dynamic
+
+@external(javascript, "./dom_ffi.ts", "set_interval")
+pub fn set_interval(fun: fn() -> Nil, ms: Int) -> Int
+
+@external(javascript, "./dom_ffi.ts", "clear_interval")
+pub fn clear_interval(id: Int) -> Nil

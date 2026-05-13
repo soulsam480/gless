@@ -15,11 +15,13 @@ pub type CellProps {
     rank: String,
     board_state: signal.Signal(state.Board),
     checks: signal.Signal(dict.Dict(piece.Piece, List(movement.Check))),
+    active_player: signal.Signal(option.Option(piece.Color)),
+    on_move: fn() -> Nil,
   )
 }
 
 pub fn render(props: CellProps) {
-  let CellProps(file, rank, board_state, checks) = props
+  let CellProps(file, rank, board_state, checks, active_player, on_move) = props
 
   let cell_id = file <> rank
 
@@ -28,6 +30,17 @@ pub fn render(props: CellProps) {
     |> signal.map(fn(state) {
       dict.get(state.visible_pieces, cell_id)
       |> option.from_result
+    })
+
+  let is_disabled =
+    signal.computed(fn() {
+      signal.value(piece)
+      |> option.map(fn(p) {
+        signal.value(active_player)
+        |> option.map(fn(active) { active != p.color })
+        |> option.unwrap(False)
+      })
+      |> option.unwrap(False)
     })
 
   let is_focused =
@@ -80,30 +93,39 @@ pub fn render(props: CellProps) {
         signal.setter(board_state, fn(prev) {
           let assert option.Some(focus_state) = prev.focused
 
-          prev
-          |> state.set_pieces(position.run(move, focus_state.piece, prev.pieces))
-          |> state.clear_focused
-          |> state.map(fn(base) {
-            base
-            |> state.set_possible_moves(
-              base.pieces
-              |> list.fold(dict.new(), fn(acc, piece) {
-                use <- bool.guard(piece.flags.taken, acc)
+          let prev =
+            prev
+            |> state.set_pieces(position.run(
+              move,
+              focus_state.piece,
+              prev.pieces,
+            ))
+            |> state.clear_focused
+            |> state.map(fn(base) {
+              base
+              |> state.set_possible_moves(
+                base.pieces
+                |> list.fold(dict.new(), fn(acc, piece) {
+                  use <- bool.guard(piece.flags.taken, acc)
 
-                acc
-                |> dict.insert(
-                  piece,
-                  position.possible(
+                  acc
+                  |> dict.insert(
                     piece,
-                    base.pieces,
-                    base.visible_pieces,
-                    signal.peek(checks),
-                    signal.peek(board_state).possible_moves,
-                  ),
-                )
-              }),
-            )
-          })
+                    position.possible(
+                      piece,
+                      base.pieces,
+                      base.visible_pieces,
+                      signal.peek(checks),
+                      signal.peek(board_state).possible_moves,
+                    ),
+                  )
+                }),
+              )
+            })
+
+          on_move()
+
+          prev
         })
 
         Nil
@@ -119,6 +141,8 @@ pub fn render(props: CellProps) {
   )
   |> vnode.child_if_signal(piece, render: fn(piece) {
     piece.new(piece, is_focused, is_destination, handle: fn(p) {
+      use <- bool.guard(signal.peek(is_disabled), Nil)
+
       signal.setter(board_state, fn(prev) {
         case signal.peek(is_destination) {
           True -> prev
@@ -141,6 +165,8 @@ pub fn render(props: CellProps) {
           }
         }
       })
+
+      Nil
     })
   })
 }
